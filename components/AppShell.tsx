@@ -1,0 +1,1770 @@
+"use client";
+
+
+
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "../lib/supabase";
+import WeekNavigator from "../components/WeekNavigator";
+import ScheduleSection from "../components/ScheduleSection";
+import WeekSection from "../components/WeekSection";
+import MonthSection from "../components/MonthSection";
+import PayrollSection from "../components/PayrollSection";
+import EmployeesSection from "../components/EmployeesSection";
+
+
+
+
+import type {
+  
+  AppTab,
+  EmployeeConfig,
+  FormState,
+  NewEmployeeForm,
+  Shift,
+} from "../types/schedule";
+
+import {
+  COMPANY_CVR,
+  COMPANY_NAME,
+  CUSTOM_ROLE_OPTION,
+  days,
+  defaultEmployees,
+  monthNames,
+  roles,
+} from "../lib/constants";
+
+import {
+  addDays,
+  formatDKK,
+  formatHours,
+  formatWeekRange,
+  fromDateInputValue,
+  getCurrentTimeString,
+  getDayNameFromDate,
+  getMonthCalendarDays,
+  getPlannedHours,
+  getWeekDates,
+  getWorkedHours,
+  isOverlap,
+  isValidFullTime,
+  normalizeEmployeesData,
+  normalizeManualTimeInput,
+  normalizeShiftsData,
+  roleStyles,
+  roundTime,
+  sortEmployeesForDisplay,
+  startOfWeek,
+  toDateInputValue,
+} from "../lib/utils";
+
+
+
+
+
+
+
+  
+
+
+function getISOWeekNumber(date: Date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+
+
+function getHours(start: string, end: string) {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+
+  const startMinutes = sh * 60 + sm;
+  let endMinutes = eh * 60 + em;
+
+  if (endMinutes <= startMinutes) {
+    endMinutes += 24 * 60;
+  }
+
+  return (endMinutes - startMinutes) / 60;
+}
+
+
+
+const today = new Date();
+const todayDate = toDateInputValue(today);
+const todayWeekStart = startOfWeek(today);
+const initialWeekDates = getWeekDates(todayWeekStart);
+
+const initialShifts: Shift[] = [];
+
+const defaultForm: FormState = {
+  employee: defaultEmployees[0].name,
+  role: defaultEmployees[0].defaultRole,
+  start: "10:00",
+  end: "15:00",
+  notes: "",
+  date: todayDate,
+};
+
+const defaultNewEmployeeForm: NewEmployeeForm = {
+  name: "",
+  hourlyRate: "130",
+  defaultRole: "Service",
+};
+
+export default function AppShell({ role }: { role: string }) {
+  const isAdmin = role === "admin";
+  const supabase = createClient();
+  const currentYear = new Date().getFullYear();
+
+  
+  const [activeTab, setActiveTab] = useState<AppTab>("schedule");
+  const [employees, setEmployees] =
+    useState<EmployeeConfig[]>([]);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [showShiftForm, setShowShiftForm] = useState(false);
+
+  useEffect(() => {
+  async function fetchEmployees() {
+    const { data, error } = await supabase.from("employees").select("*");
+
+    if (error) {
+      console.log("Error fetching employees:", error);
+      return;
+    }
+
+    const mappedEmployees: EmployeeConfig[] = (data || []).map((emp) => ({
+      name: emp.name,
+      hourlyRate: Number(emp.hourly_rate),
+      defaultRole: emp.default_role,
+      unavailableDates: [],
+      active: emp.active,
+    }));
+
+    setEmployees(mappedEmployees);
+  }
+
+  async function fetchShifts() {
+    const { data, error } = await supabase
+      .from("shifts")
+      .select("*")
+      .order("date", { ascending: true })
+      .order("start", { ascending: true });
+
+    if (error) {
+      console.log("Error fetching shifts:", error);
+      return;
+    }
+
+    const mappedShifts: Shift[] = (data || []).map((shift) => ({
+      id: shift.id,
+      employee: shift.employee,
+      day: getDayNameFromDate(shift.date),
+      role: shift.role,
+      start: shift.start,
+      end: shift.end,
+      notes: shift.notes || "",
+      date: shift.date,
+      actualStart: shift.actual_start || undefined,
+      actualEnd: shift.actual_end || undefined,
+    }));
+
+    setShifts(mappedShifts);
+  }
+
+  fetchEmployees();
+  fetchShifts();
+}, []);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [weekStart, setWeekStart] = useState<Date>(todayWeekStart);
+  const [selectedDate, setSelectedDate] = useState(todayDate);
+  const [form, setForm] = useState<FormState>(defaultForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [employeeFilter, setEmployeeFilter] = useState("All");
+  const [copyFromDate, setCopyFromDate] = useState(initialWeekDates[0].date);
+  const [monthFilter, setMonthFilter] = useState(new Date().getMonth() + 1);
+  const [yearFilter, setYearFilter] = useState(currentYear);
+  const [availabilityDrafts, setAvailabilityDrafts] = useState<
+    Record<string, string>
+  >({});
+  const [newEmployeeForm, setNewEmployeeForm] = useState<NewEmployeeForm>(
+    defaultNewEmployeeForm
+  );
+  const [timesheetEmployee, setTimesheetEmployee] = useState(
+    defaultEmployees[0].name
+  );
+  const [shiftRoleMode, setShiftRoleMode] = useState<"preset" | "custom">("preset");
+  const [newEmployeeRoleMode, setNewEmployeeRoleMode] = useState<"preset" | "custom">("preset");
+
+  const sortedEmployeesData = useMemo(
+    () => sortEmployeesForDisplay(employees),
+    [employees]
+  );
+
+  const activeEmployees = useMemo(
+    () => sortedEmployeesData.filter((employee) => employee.active),
+    [sortedEmployeesData]
+  );
+
+  const activeEmployeeNames = useMemo(
+    () => activeEmployees.map((employee) => employee.name),
+    [activeEmployees]
+  );
+
+  const employeeNames = useMemo(
+    () => sortedEmployeesData.map((e) => e.name),
+    [sortedEmployeesData]
+  );
+
+  const employeeRateMap = useMemo(() => {
+    const result: Record<string, number> = {};
+    employees.forEach((e) => {
+      result[e.name] = e.hourlyRate;
+    });
+    return result;
+  }, [employees]);
+
+  const employeeRoleMap = useMemo(() => {
+    const result: Record<string, string> = {};
+    employees.forEach((e) => {
+      result[e.name] = e.defaultRole;
+    });
+    return result;
+  }, [employees]);
+
+  const employeeUnavailableMap = useMemo(() => {
+    const result: Record<string, string[]> = {};
+    employees.forEach((e) => {
+      result[e.name] = e.unavailableDates || [];
+    });
+    return result;
+  }, [employees]);
+
+  const roleSuggestions = useMemo(() => {
+    const allRoles = new Set<string>(roles);
+
+    employees.forEach((employee) => {
+      if (employee.defaultRole.trim()) {
+        allRoles.add(employee.defaultRole.trim());
+      }
+    });
+
+    shifts.forEach((shift) => {
+      if (shift.role.trim()) {
+        allRoles.add(shift.role.trim());
+      }
+    });
+
+    return Array.from(allRoles).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [employees, shifts]);
+
+  const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
+  const selectedDayName = useMemo(
+    () => getDayNameFromDate(selectedDate),
+    [selectedDate]
+  );
+
+  const currentEmployeeUnavailableDates = useMemo(() => {
+    return employeeUnavailableMap[form.employee] || [];
+  }, [employeeUnavailableMap, form.employee]);
+
+  const isFormEmployeeUnavailable = useMemo(() => {
+    return currentEmployeeUnavailableDates.includes(form.date);
+  }, [currentEmployeeUnavailableDates, form.date]);
+
+  
+
+  
+
+  
+
+  useEffect(() => {
+    const existsInWeek = weekDates.some((item) => item.date === selectedDate);
+    if (!existsInWeek) {
+      setSelectedDate(weekDates[0].date);
+      setCopyFromDate(weekDates[0].date);
+      setForm((current) => ({
+        ...current,
+        date: weekDates[0].date,
+      }));
+    }
+  }, [weekDates, selectedDate]);
+
+  useEffect(() => {
+    const selectedEmployeeStillActive = activeEmployeeNames.includes(form.employee);
+
+    if (!selectedEmployeeStillActive && activeEmployees.length > 0) {
+      setForm((current) => ({
+        ...current,
+        employee: activeEmployees[0].name,
+        role: activeEmployees[0].defaultRole,
+      }));
+    }
+  }, [activeEmployeeNames, activeEmployees, form.employee]);
+
+  useEffect(() => {
+    if (employeeFilter !== "All" && !employeeNames.includes(employeeFilter)) {
+      setEmployeeFilter("All");
+    }
+  }, [employeeFilter, employeeNames]);
+
+  useEffect(() => {
+    if (!employeeNames.includes(timesheetEmployee) && employeeNames.length > 0) {
+      setTimesheetEmployee(employeeNames[0]);
+    }
+  }, [employeeNames, timesheetEmployee]);
+
+  const filteredShifts = useMemo(() => {
+    return shifts.filter((shift) => {
+      const dateMatch = shift.date === selectedDate;
+      const employeeMatch =
+        employeeFilter === "All" || shift.employee === employeeFilter;
+      return dateMatch && employeeMatch;
+    });
+  }, [shifts, selectedDate, employeeFilter]);
+
+  const selectedDateTotals = useMemo(() => {
+    const totals: Record<string, { planned: number; worked: number }> = {};
+    for (const employee of employeeNames) {
+      totals[employee] = { planned: 0, worked: 0 };
+    }
+
+    shifts.forEach((shift) => {
+      if (shift.date !== selectedDate) return;
+      if (!totals[shift.employee]) {
+        totals[shift.employee] = { planned: 0, worked: 0 };
+      }
+      totals[shift.employee].planned += getPlannedHours(shift);
+      totals[shift.employee].worked += getWorkedHours(shift);
+    });
+
+    return totals;
+  }, [shifts, selectedDate, employeeNames]);
+
+  const dayHours = useMemo(() => {
+    return filteredShifts.reduce(
+      (sum, shift) => sum + getPlannedHours(shift),
+      0
+    );
+  }, [filteredShifts]);
+
+  const dayWorkedHours = useMemo(() => {
+    return filteredShifts.reduce((sum, shift) => sum + getWorkedHours(shift), 0);
+  }, [filteredShifts]);
+
+  const weeklyOverview = useMemo(() => {
+    const result: Record<string, Record<string, Shift[]>> = {};
+    for (const employee of employeeNames) {
+      result[employee] = {};
+      for (const item of weekDates) {
+        result[employee][item.date] = shifts.filter(
+          (shift) => shift.employee === employee && shift.date === item.date
+        );
+      }
+    }
+    return result;
+  }, [shifts, weekDates, employeeNames]);
+
+  const weeklyTotals = useMemo(() => {
+    const totals: Record<string, { planned: number; worked: number }> = {};
+    for (const employee of employeeNames) {
+      totals[employee] = { planned: 0, worked: 0 };
+    }
+
+    shifts.forEach((shift) => {
+      const inCurrentWeek = weekDates.some((item) => item.date === shift.date);
+      if (!inCurrentWeek) return;
+
+      if (!totals[shift.employee]) {
+        totals[shift.employee] = { planned: 0, worked: 0 };
+      }
+
+      totals[shift.employee].planned += getPlannedHours(shift);
+      totals[shift.employee].worked += getWorkedHours(shift);
+    });
+
+    return totals;
+  }, [shifts, weekDates, employeeNames]);
+
+  const monthlyHours = useMemo(() => {
+    const totals: Record<string, { planned: number; worked: number }> = {};
+    for (const employee of employeeNames) {
+      totals[employee] = { planned: 0, worked: 0 };
+    }
+
+    for (const shift of shifts) {
+      const shiftDate = new Date(shift.date);
+      const shiftMonth = shiftDate.getMonth() + 1;
+      const shiftYear = shiftDate.getFullYear();
+
+      if (shiftMonth === monthFilter && shiftYear === yearFilter) {
+        if (!totals[shift.employee]) {
+          totals[shift.employee] = { planned: 0, worked: 0 };
+        }
+        totals[shift.employee].planned += getPlannedHours(shift);
+        totals[shift.employee].worked += getWorkedHours(shift);
+      }
+    }
+
+    return totals;
+  }, [shifts, monthFilter, yearFilter, employeeNames]);
+
+  const payrollCosts = useMemo(() => {
+    const totals: Record<string, { plannedCost: number; workedCost: number }> =
+      {};
+    for (const employee of employeeNames) {
+      const rate = employeeRateMap[employee] || 0;
+      totals[employee] = {
+        plannedCost: monthlyHours[employee].planned * rate,
+        workedCost: monthlyHours[employee].worked * rate,
+      };
+    }
+    return totals;
+  }, [monthlyHours, employeeRateMap, employeeNames]);
+
+  const monthlyTotalPlanned = useMemo(() => {
+    return Object.values(monthlyHours).reduce(
+      (sum, item) => sum + item.planned,
+      0
+    );
+  }, [monthlyHours]);
+
+  const monthlyTotalWorked = useMemo(() => {
+    return Object.values(monthlyHours).reduce(
+      (sum, item) => sum + item.worked,
+      0
+    );
+  }, [monthlyHours]);
+
+  const monthlyTotalPlannedCost = useMemo(() => {
+    return Object.values(payrollCosts).reduce(
+      (sum, item) => sum + item.plannedCost,
+      0
+    );
+  }, [payrollCosts]);
+
+  const monthlyTotalWorkedCost = useMemo(() => {
+    return Object.values(payrollCosts).reduce(
+      (sum, item) => sum + item.workedCost,
+      0
+    );
+  }, [payrollCosts]);
+
+  const yearsAvailable = useMemo(() => {
+    const years = new Set<number>();
+    years.add(currentYear);
+    shifts.forEach((shift) => {
+      years.add(new Date(shift.date).getFullYear());
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [shifts, currentYear]);
+
+  const monthCalendarDays = useMemo(() => {
+    return getMonthCalendarDays(monthFilter, yearFilter);
+  }, [monthFilter, yearFilter]);
+
+  const monthGroupedWeeks = useMemo(() => {
+    const groups: typeof monthCalendarDays[] = [];
+    for (let i = 0; i < monthCalendarDays.length; i += 7) {
+      groups.push(monthCalendarDays.slice(i, i + 7));
+    }
+    return groups;
+  }, [monthCalendarDays]);
+
+  const selectedTimesheetRows = useMemo(() => {
+    return shifts
+      .filter((shift) => {
+        const d = new Date(shift.date);
+        return (
+          shift.employee === timesheetEmployee &&
+          d.getMonth() + 1 === monthFilter &&
+          d.getFullYear() === yearFilter
+        );
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [shifts, timesheetEmployee, monthFilter, yearFilter]);
+
+  const selectedTimesheetSummary = useMemo(() => {
+    return selectedTimesheetRows.reduce(
+      (acc, shift) => {
+        acc.planned += getPlannedHours(shift);
+        acc.worked += getWorkedHours(shift);
+        return acc;
+      },
+      { planned: 0, worked: 0 }
+    );
+  }, [selectedTimesheetRows]);
+
+  function resetForm() {
+    const firstEmployee = activeEmployees[0];
+    const firstEmployeeName =
+      firstEmployee?.name || employees[0]?.name || "Ali";
+
+    setForm({
+      employee: firstEmployeeName,
+      role: employeeRoleMap[firstEmployeeName] || "Kitchen",
+      start: "10:00",
+      end: "15:00",
+      notes: "",
+      date: selectedDate,
+    });
+    setEditingId(null);
+    setShowShiftForm(false);
+    setShiftRoleMode("preset");
+  }
+
+  function isEmployeeUnavailable(employeeName: string, date: string) {
+    const dates = employeeUnavailableMap[employeeName] || [];
+    return dates.includes(date);
+  }
+
+  async function saveShift() {
+    if (activeEmployees.length === 0) {
+      alert("Please add at least one active employee first.");
+      return;
+    }
+
+    if (!form.start || !form.end) {
+      alert("Please enter start and end time.");
+      return;
+    }
+
+    if (!form.date) {
+      alert("Please choose a date.");
+      return;
+    }
+
+    const selectedEmployee = employees.find(
+      (employee) => employee.name === form.employee
+    );
+
+    if (!selectedEmployee || !selectedEmployee.active) {
+      alert("This employee is inactive. Please choose an active employee.");
+      return;
+    }
+
+    if (isEmployeeUnavailable(form.employee, form.date)) {
+      alert(
+        `${form.employee} is marked as unavailable on ${form.date}. Please choose another date or remove the unavailable day first.`
+      );
+      return;
+    }
+
+    const finalRole = form.role.trim();
+
+    if (!finalRole) {
+      alert("Please enter a role.");
+      return;
+    }
+
+    const hasConflict = shifts.some((shift) => {
+      if (editingId !== null && shift.id === editingId) return false;
+
+      return (
+        shift.employee === form.employee &&
+        shift.date === form.date &&
+        isOverlap(shift.start, shift.end, form.start, form.end)
+      );
+    });
+
+    if (hasConflict) {
+      alert("This employee already has an overlapping shift on this date.");
+      return;
+    }
+
+    const dayName = getDayNameFromDate(form.date);
+
+    const payload = {
+      employee: form.employee,
+      date: form.date,
+      start: form.start,
+      end: form.end,
+      role: finalRole,
+      notes: form.notes || null,
+    };
+
+    if (editingId !== null) {
+      const { data, error } = await supabase
+        .from("shifts")
+        .update(payload)
+        .eq("id", editingId)
+        .select()
+        .single();
+
+      if (error) {
+        alert(`Could not update shift: ${error.message}`);
+        return;
+      }
+
+      const updatedShift: Shift = {
+        id: data.id,
+        employee: data.employee,
+        date: data.date,
+        start: data.start,
+        end: data.end,
+        role: data.role,
+        notes: data.notes || "",
+        day: dayName,
+        actualStart: data.actual_start || undefined,
+        actualEnd: data.actual_end || undefined,
+      };
+
+      setShifts((current) =>
+        current.map((shift) => (shift.id === editingId ? updatedShift : shift))
+      );
+    } else {
+      const { data, error } = await supabase
+        .from("shifts")
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) {
+        alert(`Could not save shift: ${error.message}`);
+        return;
+      }
+
+      const newShift: Shift = {
+        id: data.id,
+        employee: data.employee,
+        date: data.date,
+        start: data.start,
+        end: data.end,
+        role: data.role,
+        notes: data.notes || "",
+        day: dayName,
+        actualStart: data.actual_start || undefined,
+        actualEnd: data.actual_end || undefined,
+      };
+
+      setShifts((current) => [...current, newShift]);
+    }
+
+    resetForm();
+  }
+
+  function startEdit(shift: Shift) {
+    setShowShiftForm(true);
+    setActiveTab("schedule");
+    setEditingId(shift.id);
+    setForm({
+      employee: shift.employee,
+      role: shift.role,
+      start: shift.start,
+      end: shift.end,
+      notes: shift.notes,
+      date: shift.date,
+    });
+    setShiftRoleMode(roleSuggestions.includes(shift.role) ? "preset" : "custom");
+    setSelectedDate(shift.date);
+    setWeekStart(startOfWeek(fromDateInputValue(shift.date)));
+  }
+
+  async function deleteShift(id: string) {
+    const { error } = await supabase.from("shifts").delete().eq("id", id);
+
+    if (error) {
+      alert(`Could not delete shift: ${error.message}`);
+      return;
+    }
+
+    setShifts((current) => current.filter((shift) => shift.id !== id));
+    if (editingId === id) resetForm();
+  }
+
+  function copyDayShifts() {
+    const sourceShifts = shifts.filter((shift) => shift.date === copyFromDate);
+
+    if (sourceShifts.length === 0) {
+      alert("No shifts to copy from that date.");
+      return;
+    }
+
+    const inactiveEmployees = sourceShifts
+      .filter(
+        (shift) =>
+          !employees.find(
+            (employee) => employee.name === shift.employee && employee.active
+          )
+      )
+      .map((shift) => shift.employee);
+
+    if (inactiveEmployees.length > 0) {
+      const uniqueInactiveEmployees = Array.from(new Set(inactiveEmployees));
+      alert(
+        `Cannot copy because these employees are inactive: ${uniqueInactiveEmployees.join(
+          ", "
+        )}`
+      );
+      return;
+    }
+
+    const unavailableEmployees = sourceShifts
+      .filter((shift) => isEmployeeUnavailable(shift.employee, selectedDate))
+      .map((shift) => shift.employee);
+
+    if (unavailableEmployees.length > 0) {
+      const uniqueUnavailableEmployees = Array.from(
+        new Set(unavailableEmployees)
+      );
+      alert(
+        `Cannot copy because these employees are unavailable on ${selectedDate}: ${uniqueUnavailableEmployees.join(
+          ", "
+        )}`
+      );
+      return;
+    }
+
+    const conflictingEmployees = sourceShifts
+      .filter((sourceShift) =>
+        shifts.some(
+          (existingShift) =>
+            existingShift.employee === sourceShift.employee &&
+            existingShift.date === selectedDate &&
+            isOverlap(
+              existingShift.start,
+              existingShift.end,
+              sourceShift.start,
+              sourceShift.end
+            )
+        )
+      )
+      .map((shift) => shift.employee);
+
+    if (conflictingEmployees.length > 0) {
+      const uniqueConflictingEmployees = Array.from(
+        new Set(conflictingEmployees)
+      );
+      alert(
+        `Cannot copy because overlapping shifts already exist on ${selectedDate} for: ${uniqueConflictingEmployees.join(
+          ", "
+        )}`
+      );
+      return;
+    }
+
+    const copied = sourceShifts.map((shift) => ({
+      ...shift,
+      id: Date.now() + Math.floor(Math.random() * 100000),
+      date: selectedDate,
+      day: getDayNameFromDate(selectedDate),
+      actualStart: undefined,
+      actualEnd: undefined,
+    }));
+
+    setShifts((current) => [...current, ...copied]);
+  }
+
+  async function clearSelectedDay() {
+    const ok = window.confirm(
+      `Delete all shifts for ${selectedDayName} (${selectedDate})?`
+    );
+    if (!ok) return;
+
+    const { error } = await supabase.from("shifts").delete().eq("date", selectedDate);
+
+    if (error) {
+      alert(`Could not clear shifts: ${error.message}`);
+      return;
+    }
+
+    setShifts((current) =>
+      current.filter((shift) => shift.date !== selectedDate)
+    );
+  }
+
+  function applyPlannedAsActual(shiftId: number) {
+    setShifts((current) =>
+      current.map((shift) =>
+        shift.id === shiftId
+          ? {
+              ...shift,
+              actualStart: roundTime(shift.start),
+              actualEnd: roundTime(shift.end),
+            }
+          : shift
+      )
+    );
+  }
+
+  function applyPlannedToAllSelectedDay() {
+    const selectedDayShifts = shifts.filter((shift) => shift.date === selectedDate);
+
+    if (selectedDayShifts.length === 0) {
+      alert("No shifts found on selected day.");
+      return;
+    }
+
+    setShifts((current) =>
+      current.map((shift) =>
+        shift.date === selectedDate
+          ? {
+              ...shift,
+              actualStart: roundTime(shift.start),
+              actualEnd: roundTime(shift.end),
+            }
+          : shift
+      )
+    );
+  }
+
+  function goToPreviousWeek() {
+    const newWeekStart = addDays(weekStart, -7);
+    const newWeekDates = getWeekDates(newWeekStart);
+    setWeekStart(newWeekStart);
+    setSelectedDate(newWeekDates[0].date);
+    setCopyFromDate(newWeekDates[0].date);
+    setForm((current) => ({ ...current, date: newWeekDates[0].date }));
+  }
+
+  function goToNextWeek() {
+    const newWeekStart = addDays(weekStart, 7);
+    const newWeekDates = getWeekDates(newWeekStart);
+    setWeekStart(newWeekStart);
+    setSelectedDate(newWeekDates[0].date);
+    setCopyFromDate(newWeekDates[0].date);
+    setForm((current) => ({ ...current, date: newWeekDates[0].date }));
+  }
+
+  function goToThisWeek() {
+    const newWeekStart = startOfWeek(new Date());
+    const newWeekDates = getWeekDates(newWeekStart);
+    setWeekStart(newWeekStart);
+    setSelectedDate(todayDate);
+    setCopyFromDate(newWeekDates[0].date);
+    setForm((current) => ({ ...current, date: todayDate }));
+  }
+
+  function updateEmployeeRate(name: string, newRate: number) {
+    setEmployees((current) =>
+      current.map((employee) =>
+        employee.name === name
+          ? { ...employee, hourlyRate: Number.isNaN(newRate) ? 0 : newRate }
+          : employee
+      )
+    );
+  }
+
+  function updateEmployeeRole(name: string, newRole: string) {
+    const trimmedRole = newRole.trim() || "Kitchen";
+
+    setEmployees((current) =>
+      current.map((employee) =>
+        employee.name === name ? { ...employee, defaultRole: trimmedRole } : employee
+      )
+    );
+
+    if (form.employee === name) {
+      setForm((current) => ({ ...current, role: trimmedRole }));
+    }
+  }
+
+  function updateEmployeeName(oldName: string, newName: string) {
+    const trimmed = newName.trim();
+
+    if (!trimmed) {
+      alert("Employee name cannot be empty.");
+      return;
+    }
+
+    const nameExists = employees.some(
+      (employee) =>
+        employee.name.toLowerCase() === trimmed.toLowerCase() &&
+        employee.name !== oldName
+    );
+
+    if (nameExists) {
+      alert("An employee with this name already exists.");
+      return;
+    }
+
+    setEmployees((current) =>
+      current.map((employee) =>
+        employee.name === oldName ? { ...employee, name: trimmed } : employee
+      )
+    );
+
+    setShifts((current) =>
+      current.map((shift) =>
+        shift.employee === oldName ? { ...shift, employee: trimmed } : shift
+      )
+    );
+
+    if (form.employee === oldName) {
+      setForm((current) => ({ ...current, employee: trimmed }));
+    }
+
+    if (employeeFilter === oldName) {
+      setEmployeeFilter(trimmed);
+    }
+
+    if (timesheetEmployee === oldName) {
+      setTimesheetEmployee(trimmed);
+    }
+  }
+
+  function setEmployeeActiveStatus(name: string, active: boolean) {
+    const employee = employees.find((item) => item.name === name);
+    if (!employee) return;
+
+    if (!active) {
+      const activeCount = employees.filter((item) => item.active).length;
+
+      if (employee.active && activeCount === 1) {
+        alert("You must keep at least one active employee.");
+        return;
+      }
+
+      if (form.employee === name) {
+        const replacement = sortEmployeesForDisplay(
+          employees.filter((item) => item.active && item.name !== name)
+        )[0];
+
+        if (replacement) {
+          setForm((current) => ({
+            ...current,
+            employee: replacement.name,
+            role: replacement.defaultRole,
+          }));
+        }
+      }
+    }
+
+    setEmployees((current) =>
+      current.map((item) => (item.name === name ? { ...item, active } : item))
+    );
+  }
+
+  function deleteEmployee(name: string) {
+    const employee = employees.find((item) => item.name === name);
+    if (!employee) return;
+
+    const hasShifts = shifts.some((shift) => shift.employee === name);
+
+    if (hasShifts) {
+      alert(
+        "This employee has shift history, so permanent delete is blocked. Set the employee inactive instead."
+      );
+      return;
+    }
+
+    const activeCount = employees.filter((item) => item.active).length;
+    if (employee.active && activeCount === 1) {
+      alert("You must keep at least one active employee.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `Delete employee "${name}" permanently? This cannot be undone.`
+    );
+    if (!ok) return;
+
+    setEmployees((current) =>
+      current.filter((employeeItem) => employeeItem.name !== name)
+    );
+
+    if (form.employee === name) {
+      const replacement = sortEmployeesForDisplay(
+        employees.filter((item) => item.name !== name && item.active)
+      )[0];
+
+      if (replacement) {
+        setForm((current) => ({
+          ...current,
+          employee: replacement.name,
+          role: replacement.defaultRole,
+        }));
+      }
+    }
+
+    if (employeeFilter === name) {
+      setEmployeeFilter("All");
+    }
+
+    if (timesheetEmployee === name) {
+      const replacement = sortEmployeesForDisplay(
+        employees.filter((item) => item.name !== name)
+      )[0];
+      if (replacement) {
+        setTimesheetEmployee(replacement.name);
+      }
+    }
+  }
+
+  function handleEmployeeChange(name: string) {
+    const nextRole = employeeRoleMap[name] || "Kitchen";
+
+    setForm((current) => ({
+      ...current,
+      employee: name,
+      role: nextRole,
+    }));
+    setShiftRoleMode(roleSuggestions.includes(nextRole) ? "preset" : "custom");
+  }
+
+  function updateAvailabilityDraft(name: string, value: string) {
+    setAvailabilityDrafts((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
+
+  function addUnavailableDate(name: string) {
+    const dateToAdd = availabilityDrafts[name];
+
+    if (!dateToAdd) {
+      alert("Please choose a date first.");
+      return;
+    }
+
+    setEmployees((current) =>
+      current.map((employee) => {
+        if (employee.name !== name) return employee;
+        if (employee.unavailableDates.includes(dateToAdd)) return employee;
+
+        return {
+          ...employee,
+          unavailableDates: [...employee.unavailableDates, dateToAdd].sort(),
+        };
+      })
+    );
+
+    setAvailabilityDrafts((current) => ({
+      ...current,
+      [name]: "",
+    }));
+  }
+
+  function removeUnavailableDate(name: string, dateToRemove: string) {
+    setEmployees((current) =>
+      current.map((employee) =>
+        employee.name === name
+          ? {
+              ...employee,
+              unavailableDates: employee.unavailableDates.filter(
+                (date) => date !== dateToRemove
+              ),
+            }
+          : employee
+      )
+    );
+  }
+
+  function addEmployee() {
+    const trimmedName = newEmployeeForm.name.trim();
+    const hourlyRate = Number(newEmployeeForm.hourlyRate);
+    const trimmedRole = newEmployeeForm.defaultRole.trim() || "Service";
+
+    if (!trimmedName) {
+      alert("Please enter employee name.");
+      return;
+    }
+
+    const exists = employees.some(
+      (employee) => employee.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (exists) {
+      alert("Employee name already exists.");
+      return;
+    }
+
+    if (Number.isNaN(hourlyRate) || hourlyRate < 0) {
+      alert("Please enter a valid hourly rate.");
+      return;
+    }
+
+    const newEmployee: EmployeeConfig = {
+      name: trimmedName,
+      hourlyRate,
+      defaultRole: trimmedRole,
+      unavailableDates: [],
+      active: true,
+    };
+
+    setEmployees((current) => [...current, newEmployee]);
+
+    if (activeEmployees.length === 0) {
+      setForm((current) => ({
+        ...current,
+        employee: trimmedName,
+        role: newEmployee.defaultRole,
+      }));
+    }
+
+    if (employeeNames.length === 0) {
+      setTimesheetEmployee(trimmedName);
+    }
+
+    setNewEmployeeForm(defaultNewEmployeeForm);
+    setNewEmployeeRoleMode("preset");
+  }
+
+  async function punchIn(id: string) {
+    const now = getCurrentTimeString();
+    const rounded = roundTime(now);
+
+    const { data, error } = await supabase
+      .from("shifts")
+      .update({ actual_start: rounded, actual_end: null })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      alert(`Could not punch in: ${error.message}`);
+      return;
+    }
+
+    setShifts((current) =>
+      current.map((shift) =>
+        shift.id === id
+          ? {
+              ...shift,
+              actualStart: data.actual_start || undefined,
+              actualEnd: data.actual_end || undefined,
+            }
+          : shift
+      )
+    );
+  }
+
+  async function punchOut(id: string) {
+    const now = getCurrentTimeString();
+    const targetShift = shifts.find((shift) => shift.id === id);
+    const roundedNow = roundTime(now);
+
+    if (!targetShift?.actualStart) {
+      alert("Please punch in first.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("shifts")
+      .update({ actual_end: roundedNow })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      alert(`Could not punch out: ${error.message}`);
+      return;
+    }
+
+    setShifts((current) =>
+      current.map((shift) =>
+        shift.id === id
+          ? {
+              ...shift,
+              actualStart: data.actual_start || undefined,
+              actualEnd: data.actual_end || undefined,
+            }
+          : shift
+      )
+    );
+  }
+
+  async function resetPunch(id: string) {
+    const { data, error } = await supabase
+      .from("shifts")
+      .update({ actual_start: null, actual_end: null })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      alert(`Could not reset actual times: ${error.message}`);
+      return;
+    }
+
+    setShifts((current) =>
+      current.map((shift) =>
+        shift.id === id
+          ? {
+              ...shift,
+              actualStart: data.actual_start || undefined,
+              actualEnd: data.actual_end || undefined,
+            }
+          : shift
+      )
+    );
+  }
+
+  function goToDate(date: string) {
+    setSelectedDate(date);
+    setWeekStart(startOfWeek(fromDateInputValue(date)));
+    setForm((current) => ({ ...current, date }));
+    setActiveTab("schedule");
+  }
+
+  function downloadPayrollCsv() {
+    const rows = [
+      ["Company", COMPANY_NAME],
+      ["CVR", COMPANY_CVR],
+      ["Month", monthNames[monthFilter]],
+      ["Year", String(yearFilter)],
+      [],
+      [
+        "Employee",
+        "Month",
+        "Year",
+        "Planned Hours",
+        "Worked Hours",
+        "Rate DKK",
+        "Planned Cost DKK",
+        "Worked Cost DKK",
+      ],
+      ...employeeNames.map((employee) => [
+        employee,
+        monthNames[monthFilter],
+        String(yearFilter),
+        monthlyHours[employee].planned.toFixed(1),
+        monthlyHours[employee].worked.toFixed(1),
+        String(employeeRateMap[employee] || 0),
+        payrollCosts[employee].plannedCost.toFixed(2),
+        payrollCosts[employee].workedCost.toFixed(2),
+      ]),
+      [],
+      [
+        "Totals",
+        "",
+        "",
+        monthlyTotalPlanned.toFixed(1),
+        monthlyTotalWorked.toFixed(1),
+        "",
+        monthlyTotalPlannedCost.toFixed(2),
+        monthlyTotalWorkedCost.toFixed(2),
+      ],
+    ];
+
+    const csvContent = rows.map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `${COMPANY_NAME.replace(/\s+/g, "-").toLowerCase()}-${monthNames[
+        monthFilter
+      ].toLowerCase()}-${yearFilter}-payroll.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function downloadPayrollPdf() {
+    const reportHtml = `
+      <html>
+        <head>
+          <title>Payroll Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+            h1, p { margin: 0 0 10px 0; }
+            .header { margin-bottom: 24px; }
+            .summary { margin: 20px 0; padding: 16px; border: 1px solid #d1d5db; border-radius: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border: 1px solid #d1d5db; padding: 10px; text-align: left; }
+            th { background: #f3f4f6; }
+            .total { margin-top: 20px; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${COMPANY_NAME}</h1>
+            <p>CVR: ${COMPANY_CVR}</p>
+            <p>Payroll Report for ${monthNames[monthFilter]} ${yearFilter}</p>
+          </div>
+
+          <div class="summary">
+            <p><strong>Total Planned Hours:</strong> ${monthlyTotalPlanned.toFixed(
+              1
+            )} hrs</p>
+            <p><strong>Total Worked Hours:</strong> ${monthlyTotalWorked.toFixed(
+              1
+            )} hrs</p>
+            <p><strong>Planned Payroll Cost:</strong> ${formatDKK(
+              monthlyTotalPlannedCost
+            )}</p>
+            <p><strong>Worked Payroll Cost:</strong> ${formatDKK(
+              monthlyTotalWorkedCost
+            )}</p>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Planned Hours</th>
+                <th>Worked Hours</th>
+                <th>Rate (DKK/hr)</th>
+                <th>Planned Cost</th>
+                <th>Worked Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${employeeNames
+                .map(
+                  (employee) => `
+                <tr>
+                  <td>${employee}</td>
+                  <td>${monthlyHours[employee].planned.toFixed(1)}</td>
+                  <td>${monthlyHours[employee].worked.toFixed(1)}</td>
+                  <td>${employeeRateMap[employee] || 0}</td>
+                  <td>${payrollCosts[employee].plannedCost.toFixed(2)}</td>
+                  <td>${payrollCosts[employee].workedCost.toFixed(2)}</td>
+                </tr>
+              `
+                )
+                .join("")}
+            </tbody>
+          </table>
+
+          <p class="total">Generated for ${COMPANY_NAME}</p>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) {
+      alert("Popup blocked. Please allow popups to export PDF.");
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(reportHtml);
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  }
+
+  function downloadEmployeeTimesheetCsv() {
+    if (!timesheetEmployee) {
+      alert("Please select an employee.");
+      return;
+    }
+
+    const rows = [
+      ["Company", COMPANY_NAME],
+      ["CVR", COMPANY_CVR],
+      ["Employee", timesheetEmployee],
+      ["Month", monthNames[monthFilter]],
+      ["Year", String(yearFilter)],
+      [],
+      [
+        "Date",
+        "Day",
+        "Role",
+        "Planned Start",
+        "Planned End",
+        "Planned Hours",
+        "Actual In",
+        "Actual Out",
+        "Worked Hours",
+        "Notes",
+      ],
+      ...selectedTimesheetRows.map((shift) => [
+        shift.date,
+        shift.day,
+        shift.role,
+        shift.start,
+        shift.end,
+        getPlannedHours(shift).toFixed(1),
+        shift.actualStart || "",
+        shift.actualEnd || "",
+        getWorkedHours(shift).toFixed(1),
+        shift.notes.replace(/,/g, ";"),
+      ]),
+      [],
+      [
+        "Totals",
+        "",
+        "",
+        "",
+        "",
+        selectedTimesheetSummary.planned.toFixed(1),
+        "",
+        "",
+        selectedTimesheetSummary.worked.toFixed(1),
+        "",
+      ],
+    ];
+
+    const csvContent = rows.map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const safeEmployee = timesheetEmployee.replace(/\s+/g, "-").toLowerCase();
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `${safeEmployee}-${monthNames[monthFilter].toLowerCase()}-${yearFilter}-timesheet.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function downloadEmployeeTimesheetPdf() {
+    if (!timesheetEmployee) {
+      alert("Please select an employee.");
+      return;
+    }
+
+    const employeeRate = employeeRateMap[timesheetEmployee] || 0;
+    const workedCost = selectedTimesheetSummary.worked * employeeRate;
+
+    const reportHtml = `
+      <html>
+        <head>
+          <title>Employee Timesheet</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+            h1, h2, p { margin: 0 0 10px 0; }
+            .header { margin-bottom: 24px; }
+            .summary { margin: 20px 0; padding: 16px; border: 1px solid #d1d5db; border-radius: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 12px; }
+            th { background: #f3f4f6; }
+            .footer { margin-top: 24px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${COMPANY_NAME}</h1>
+            <p>CVR: ${COMPANY_CVR}</p>
+            <p>Employee Timesheet</p>
+            <p><strong>Employee:</strong> ${timesheetEmployee}</p>
+            <p><strong>Period:</strong> ${monthNames[monthFilter]} ${yearFilter}</p>
+          </div>
+
+          <div class="summary">
+            <p><strong>Total Planned Hours:</strong> ${selectedTimesheetSummary.planned.toFixed(
+              1
+            )} hrs</p>
+            <p><strong>Total Worked Hours:</strong> ${selectedTimesheetSummary.worked.toFixed(
+              1
+            )} hrs</p>
+            <p><strong>Hourly Rate:</strong> ${employeeRate.toFixed(2)} DKK</p>
+            <p><strong>Worked Payroll Estimate:</strong> ${formatDKK(
+              workedCost
+            )}</p>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Day</th>
+                <th>Role</th>
+                <th>Planned</th>
+                <th>Planned Hours</th>
+                <th>Actual In</th>
+                <th>Actual Out</th>
+                <th>Worked Hours</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                selectedTimesheetRows.length === 0
+                  ? `<tr><td colspan="9">No shifts found for this period.</td></tr>`
+                  : selectedTimesheetRows
+                      .map(
+                        (shift) => `
+                  <tr>
+                    <td>${shift.date}</td>
+                    <td>${shift.day}</td>
+                    <td>${shift.role}</td>
+                    <td>${shift.start} - ${shift.end}</td>
+                    <td>${getPlannedHours(shift).toFixed(1)}</td>
+                    <td>${shift.actualStart || "—"}</td>
+                    <td>${shift.actualEnd || "—"}</td>
+                    <td>${getWorkedHours(shift).toFixed(1)}</td>
+                    <td>${shift.notes || ""}</td>
+                  </tr>
+                `
+                      )
+                      .join("")
+              }
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <p><strong>Prepared by:</strong> ${COMPANY_NAME}</p>
+            <p><strong>Signature:</strong> ________________________________</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
+    if (!printWindow) {
+      alert("Popup blocked. Please allow popups to export PDF.");
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(reportHtml);
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-100 text-slate-900">
+      <datalist id="role-suggestions">
+        {roleSuggestions.map((role) => (
+          <option key={role} value={role} />
+        ))}
+      </datalist>
+      <div className="mx-auto max-w-7xl p-4 md:p-8">
+        <div className="mb-6 rounded-3xl border border-slate-200 bg-slate-900 p-6 text-white shadow-lg">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.25em] text-slate-400">
+                Bertos Gastronomia ApS • Staff Scheduling
+              </p>
+              <h1 className="mt-2 text-3xl font-bold md:text-4xl">
+                {COMPANY_NAME}
+              </h1>
+              <p className="mt-2 text-slate-400">
+                Staff Scheduler • CVR: {COMPANY_CVR}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 md:w-[660px]">
+              <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                <p className="text-sm text-slate-300">Total Shifts</p>
+                <p className="mt-1 text-2xl font-bold">{shifts.length}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                <p className="text-sm text-slate-300">{selectedDayName} Planned</p>
+                <p className="mt-1 text-2xl font-bold">{dayHours.toFixed(1)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                <p className="text-sm text-slate-300">{selectedDayName} Actual</p>
+                <p className="mt-1 text-2xl font-bold">
+                  {dayWorkedHours.toFixed(1)}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                <p className="text-sm text-slate-300">Active Employees</p>
+                <p className="mt-1 text-2xl font-bold">{activeEmployees.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* TOP NAVIGATION TABS */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {[
+  { key: "schedule", label: "Schedule" },
+  { key: "week", label: "Week View" },
+  { key: "month", label: "Month View" },
+  ...(isAdmin
+    ? [
+        { key: "payroll", label: "Payroll" },
+        { key: "employees", label: "Employees" },
+      ]
+    : []),
+].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as AppTab)}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                activeTab === tab.key
+                  ? " bg-slate-900 text-white"
+                  : " bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "schedule" && (
+        <div className="mb-6 rounded-3xl bg-white p-4 shadow-sm">
+          <WeekNavigator
+            weekStart={weekStart}
+            goPrev={goToPreviousWeek}
+            goNext={goToNextWeek}
+            goToday={goToThisWeek}
+            setWeekStart={setWeekStart}
+            setSelectedDate={setSelectedDate}
+            setCopyFromDate={setCopyFromDate}
+            setForm={setForm}
+          />
+        </div>
+        )}
+
+        {activeTab === "schedule" && (
+  <ScheduleSection
+    weekDates={weekDates}
+    shifts={shifts}
+    employees={employees}
+    selectedDate={selectedDate}
+    setSelectedDate={setSelectedDate}
+    setForm={setForm}
+    setOpenMenuId={setOpenMenuId}
+    selectedDayName={selectedDayName}
+    filteredShifts={filteredShifts}
+    employeeFilter={employeeFilter}
+    setEmployeeFilter={setEmployeeFilter}
+    employeeNames={employeeNames}
+    setEditingId={setEditingId}
+    employeeRoleMap={employeeRoleMap}
+    currentEmployeeUnavailableDates={currentEmployeeUnavailableDates}
+    setShiftRoleMode={setShiftRoleMode}
+    setShowShiftForm={setShowShiftForm}
+    showShiftForm={showShiftForm}
+    applyPlannedToAllSelectedDay={applyPlannedToAllSelectedDay}
+    clearSelectedDay={clearSelectedDay}
+    dayHours={dayHours}
+    dayWorkedHours={dayWorkedHours}
+    activeEmployees={activeEmployees}
+    editingId={editingId}
+    resetForm={resetForm}
+    activeEmployeeNames={activeEmployeeNames}
+    form={form}
+    handleEmployeeChange={handleEmployeeChange}
+    roleSuggestions={roleSuggestions}
+    CUSTOM_ROLE_OPTION={CUSTOM_ROLE_OPTION}
+    isFormEmployeeUnavailable={isFormEmployeeUnavailable}
+    saveShift={saveShift}
+    monthNames={monthNames}
+    copyFromDate={copyFromDate}
+    setCopyFromDate={setCopyFromDate}
+    copyDayShifts={copyDayShifts}
+    employeesUnavailableOnSelectedDate={employees
+      .filter((employee) => employee.unavailableDates.includes(selectedDate))
+      .map((employee) => employee.name)}
+    openMenuId={openMenuId}
+    punchIn={punchIn}
+    punchOut={punchOut}
+    normalizeManualTimeInput={normalizeManualTimeInput}
+    isValidFullTime={isValidFullTime}
+    roundTime={roundTime}
+    setShifts={setShifts}
+    applyPlannedAsActual={applyPlannedAsActual}
+    startEdit={startEdit}
+    deleteShift={deleteShift}
+    resetPunch={resetPunch}
+    roleStyles={roleStyles}
+    getPlannedHours={getPlannedHours}
+    getWorkedHours={getWorkedHours}
+    isAdmin={isAdmin}
+  />
+)}
+            
+          
+{activeTab === "week" && (
+  <WeekSection
+    weekDates={weekDates}
+    employeeNames={employeeNames}
+    employees={employees}
+    weeklyOverview={weeklyOverview}
+    isEmployeeUnavailable={isEmployeeUnavailable}
+    getPlannedHours={getPlannedHours}
+    getWorkedHours={getWorkedHours}
+    roleStyles={roleStyles}
+    weeklyTotals={weeklyTotals}
+  />
+)}
+            
+          
+        {activeTab === "month" && (
+  <MonthSection
+    monthFilter={monthFilter}
+    setMonthFilter={setMonthFilter}
+    yearFilter={yearFilter}
+    setYearFilter={setYearFilter}
+    yearsAvailable={yearsAvailable}
+    monthlyTotalPlanned={monthlyTotalPlanned}
+    monthlyTotalWorked={monthlyTotalWorked}
+    shifts={shifts}
+    monthGroupedWeeks={monthGroupedWeeks}
+    getPlannedHours={getPlannedHours}
+    getWorkedHours={getWorkedHours}
+    roleStyles={roleStyles}
+    goToDate={goToDate}
+    employeeNames={employeeNames}
+    employees={employees}
+    monthlyHours={monthlyHours}
+    formatHours={formatHours}
+  />
+)}
+            
+        {isAdmin && activeTab === "payroll" && (
+  <PayrollSection
+    monthFilter={monthFilter}
+    setMonthFilter={setMonthFilter}
+    yearFilter={yearFilter}
+    setYearFilter={setYearFilter}
+    yearsAvailable={yearsAvailable}
+    downloadPayrollCsv={downloadPayrollCsv}
+    downloadPayrollPdf={downloadPayrollPdf}
+    COMPANY_NAME={COMPANY_NAME}
+    COMPANY_CVR={COMPANY_CVR}
+    monthlyTotalPlanned={monthlyTotalPlanned}
+    monthlyTotalWorked={monthlyTotalWorked}
+    monthlyTotalPlannedCost={monthlyTotalPlannedCost}
+    monthlyTotalWorkedCost={monthlyTotalWorkedCost}
+    formatDKK={formatDKK}
+    employeeNames={employeeNames}
+    employees={employees}
+    monthlyHours={monthlyHours}
+    employeeRateMap={employeeRateMap}
+    payrollCosts={payrollCosts}
+    timesheetEmployee={timesheetEmployee}
+    setTimesheetEmployee={setTimesheetEmployee}
+    downloadEmployeeTimesheetCsv={downloadEmployeeTimesheetCsv}
+    downloadEmployeeTimesheetPdf={downloadEmployeeTimesheetPdf}
+    selectedTimesheetRows={selectedTimesheetRows}
+    selectedTimesheetSummary={selectedTimesheetSummary}
+    getPlannedHours={getPlannedHours}
+    getWorkedHours={getWorkedHours}
+    monthNames={monthNames}
+  />
+)}
+              
+          
+       {isAdmin && activeTab === "employees" && (
+  <EmployeesSection
+    sortedEmployeesData={sortedEmployeesData}
+    newEmployeeForm={newEmployeeForm}
+    setNewEmployeeForm={setNewEmployeeForm}
+    newEmployeeRoleMode={newEmployeeRoleMode}
+    setNewEmployeeRoleMode={setNewEmployeeRoleMode}
+    roleSuggestions={roleSuggestions}
+    CUSTOM_ROLE_OPTION={CUSTOM_ROLE_OPTION}
+    addEmployee={addEmployee}
+    setEmployeeActiveStatus={setEmployeeActiveStatus}
+    deleteEmployee={deleteEmployee}
+    updateEmployeeName={updateEmployeeName}
+    updateEmployeeRate={updateEmployeeRate}
+    updateEmployeeRole={updateEmployeeRole}
+    availabilityDrafts={availabilityDrafts}
+    updateAvailabilityDraft={updateAvailabilityDraft}
+    addUnavailableDate={addUnavailableDate}
+    removeUnavailableDate={removeUnavailableDate}
+  />
+)}
+                    
+      </div>
+    </main>
+  );
+}
+

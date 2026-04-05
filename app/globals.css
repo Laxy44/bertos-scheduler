@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5ede2;
+  --foreground: #1f1a16;
+  --surface: rgba(255, 251, 245, 0.84);
+  --surface-strong: rgba(255, 252, 247, 0.94);
+  --line: rgba(95, 68, 47, 0.14);
+  --accent: #a65f31;
+  --accent-strong: #6d3921;
+  --accent-soft: #ebc7a3;
+  --forest: #255447;
+  --shadow-lg: 0 22px 70px rgba(73, 43, 24, 0.14);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-manrope);
+  --font-mono: var(--font-plex-mono);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-manrope), sans-serif;
+  background-image:
+    radial-gradient(circle at top left, rgba(235, 199, 163, 0.85), transparent 28%),
+    radial-gradient(circle at 85% 14%, rgba(37, 84, 71, 0.16), transparent 24%),
+    linear-gradient(180deg, #fbf7f1 0%, #f3ebdf 40%, #efe2d2 100%);
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: auto;
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(16px);
+}
+
+body::before {
+  top: 88px;
+  right: 6vw;
+  width: 280px;
+  height: 280px;
+  background: rgba(166, 95, 49, 0.12);
+}
+
+body::after {
+  bottom: 48px;
+  left: 4vw;
+  width: 220px;
+  height: 220px;
+  background: rgba(37, 84, 71, 0.1);
+}
+
+::selection {
+  background: rgba(166, 95, 49, 0.18);
+}
+
+.scheduler-app {
+  position: relative;
+  isolation: isolate;
+}
+
+.scheduler-shell {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(107, 71, 39, 0.12);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.28), transparent 26%),
+    linear-gradient(135deg, rgba(255, 250, 242, 0.96), rgba(246, 228, 205, 0.9) 52%, rgba(232, 207, 183, 0.96));
+  box-shadow: var(--shadow-lg);
+}
+
+.hero-panel::after {
+  content: "";
+  position: absolute;
+  inset: -40% auto auto 58%;
+  width: 420px;
+  height: 420px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(37, 84, 71, 0.16), transparent 62%);
+}
+
+.hero-metric {
+  border: 1px solid rgba(109, 57, 33, 0.08);
+  background: rgba(255, 252, 247, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+.top-tabs {
+  border: 1px solid var(--line);
+  background: rgba(255, 251, 247, 0.72);
+  box-shadow: 0 12px 30px rgba(91, 58, 34, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.toolbar-panel,
+.content-panel {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 18px 48px rgba(88, 58, 35, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.content-panel table {
+  border-collapse: separate;
+}
+
+.content-panel th {
+  color: #7a6351;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.content-panel :is(input, select, textarea) {
+  border-color: rgba(126, 92, 58, 0.18);
+  background: rgba(255, 253, 249, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.content-panel :is(input, select, textarea):focus {
+  border-color: rgba(166, 95, 49, 0.48);
+  box-shadow: 0 0 0 4px rgba(166, 95, 49, 0.1);
+  outline: none;
+}
+
+.content-panel button,
+.toolbar-panel button,
+.top-tabs button {
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.content-panel button:hover,
+.toolbar-panel button:hover,
+.top-tabs button:hover {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  body::before,
+  body::after {
+    opacity: 0.6;
+  }
+}
