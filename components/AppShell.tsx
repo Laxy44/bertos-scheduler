@@ -114,7 +114,13 @@ const defaultNewEmployeeForm: NewEmployeeForm = {
   defaultRole: "Service",
 };
 
-export default function AppShell({ role }: { role: string }) {
+export default function AppShell({
+  role,
+  employeeName,
+}: {
+  role: string;
+  employeeName: string | null;
+}) {
   const isAdmin = role === "admin";
   const supabase = createClient();
   const currentYear = new Date().getFullYear();
