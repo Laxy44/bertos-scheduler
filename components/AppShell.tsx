@@ -783,7 +783,7 @@ export default function AppShell({
     );
   }
 
-  function applyPlannedAsActual(shiftId: number) {
+  function applyPlannedAsActual(shiftId: string) {
     setShifts((current) =>
       current.map((shift) =>
         shift.id === shiftId
