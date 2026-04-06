@@ -24,7 +24,7 @@ export default async function Page() {
   return (
     <AppShell
       role={role}
-      employeeName={user.email} // 👈 IMPORTANT FIX
+      employeeName={user.email ?? null} // 👈 IMPORTANT FIX
     />
   );
 }
