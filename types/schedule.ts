@@ -1,5 +1,5 @@
 export type Shift = {
-  id: number;
+  id: string;
   employee: string;
   day: string;
   role: string;
