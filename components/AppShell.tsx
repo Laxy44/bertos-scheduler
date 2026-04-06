@@ -755,7 +755,7 @@ export default function AppShell({
 
     const copied = sourceShifts.map((shift) => ({
       ...shift,
-      id: Date.now() + Math.floor(Math.random() * 100000),
+      id: crypto.randomUUID(),
       date: selectedDate,
       day: getDayNameFromDate(selectedDate),
       actualStart: undefined,
