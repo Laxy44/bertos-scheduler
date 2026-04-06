@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { addDays, formatWeekRange, getWeekDates } from "../lib/utils";
+import { addDays, formatWeekRange, getWeekDates } from "../../lib/utils";
 
 export default function WeekNavigator({
   weekStart,

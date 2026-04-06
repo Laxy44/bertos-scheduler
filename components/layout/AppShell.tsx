@@ -3,13 +3,13 @@
 
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "../lib/supabase";
-import WeekNavigator from "../components/WeekNavigator";
-import ScheduleSection from "../components/ScheduleSection";
-import WeekSection from "../components/WeekSection";
-import MonthSection from "../components/MonthSection";
-import PayrollSection from "../components/PayrollSection";
-import EmployeesSection from "../components/EmployeesSection";
+import { createClient } from "../../lib/supabase";
+import WeekNavigator from "../schedule/WeekNavigator";
+import ScheduleSection from "../schedule/ScheduleSection";
+import WeekSection from "../schedule/WeekSection";
+import MonthSection from "../month/MonthSection";
+import PayrollSection from "../payroll/PayrollSection";
+import EmployeesSection from "../employees/EmployeesSection";
 import { useRouter } from "next/navigation";
 
 
@@ -21,7 +21,7 @@ import type {
   FormState,
   NewEmployeeForm,
   Shift,
-} from "../types/schedule";
+} from "../../types/schedule";
 
 import {
   COMPANY_CVR,
@@ -31,7 +31,7 @@ import {
   defaultEmployees,
   monthNames,
   roles,
-} from "../lib/constants";
+} from "../../lib/constants";
 
 import {
   addDays,
@@ -55,7 +55,7 @@ import {
   sortEmployeesForDisplay,
   startOfWeek,
   toDateInputValue,
-} from "../lib/utils";
+} from "../../lib/utils";
 
 
 
