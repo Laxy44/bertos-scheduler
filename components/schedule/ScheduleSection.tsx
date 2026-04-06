@@ -54,6 +54,15 @@ export default function ScheduleSection({
   getWorkedHours,
   isAdmin,
 }: any) {
+  const scheduleGridEmployees = (employeeFilter === "All"
+    ? activeEmployeeNames
+    : activeEmployeeNames.filter((name: string) => name === employeeFilter)
+  ).filter((name: string) =>
+    weekDates.some((item: any) =>
+      shifts.some((shift: any) => shift.employee === name && shift.date === item.date)
+    )
+  );
+
   return (
     <section className="rounded-3xl bg-white p-5 shadow-sm">
       <div className="mb-5 flex gap-2 overflow-x-auto whitespace-nowrap pb-1">
@@ -390,6 +399,127 @@ export default function ScheduleSection({
           </button>
         </div>
       )}
+
+      <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto">
+          <div className="min-w-[980px]">
+            <div className="grid grid-cols-[220px_repeat(7,minmax(120px,1fr))] border-b border-slate-200 bg-slate-50">
+              <div className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+                Employee
+              </div>
+              {weekDates.map((item: any) => {
+                const dateObj = new Date(item.date);
+                const isSelected = selectedDate === item.date;
+
+                return (
+                  <button
+                    key={item.date}
+                    onClick={() => {
+                      setSelectedDate(item.date);
+                      setForm((current: any) => ({ ...current, date: item.date }));
+                      setOpenMenuId(null);
+                    }}
+                    className={`border-r border-slate-200 p-4 text-left transition last:border-r-0 ${
+                      isSelected ? "bg-slate-900 text-white" : "bg-slate-50 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${
+                      isSelected ? "text-white/70" : "text-slate-400"
+                    }`}>
+                      {item.dayName.slice(0, 3)}
+                    </div>
+                    <div className="mt-1 text-sm font-bold">
+                      {String(dateObj.getDate()).padStart(2, "0")}
+                    </div>
+                    <div className={`mt-1 text-xs ${isSelected ? "text-white/80" : "text-slate-500"}`}>
+                      {monthNames[dateObj.getMonth() + 1]}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {scheduleGridEmployees.length === 0 ? (
+              <div className="p-10 text-center text-sm text-slate-500">
+                No scheduled employees found for the current filter.
+              </div>
+            ) : (
+              scheduleGridEmployees.map((employeeName: string) => {
+                const employeeInfo = employees.find(
+                  (employee: any) => employee.name === employeeName
+                );
+
+                return (
+                  <div
+                    key={employeeName}
+                    className="grid grid-cols-[220px_repeat(7,minmax(120px,1fr))] border-b border-slate-200 last:border-b-0"
+                  >
+                    <div className="sticky left-0 z-10 flex min-h-[92px] items-center border-r border-slate-200 bg-white p-4">
+                      <div>
+                        <div className="font-semibold text-slate-900">{employeeName}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {employeeInfo?.defaultRole || "No default role"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {weekDates.map((item: any) => {
+                      const dayShifts = shifts
+                        .filter(
+                          (shift: any) =>
+                            shift.employee === employeeName && shift.date === item.date
+                        )
+                        .sort((a: any, b: any) => a.start.localeCompare(b.start));
+
+                      const isUnavailable = employeeInfo?.unavailableDates?.includes(item.date);
+                      const isSelected = selectedDate === item.date;
+
+                      return (
+                        <button
+                          key={`${employeeName}-${item.date}`}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDate(item.date);
+                            setForm((current: any) => ({ ...current, date: item.date }));
+                            setOpenMenuId(null);
+                          }}
+                          className={`min-h-[92px] border-r border-slate-200 p-3 text-left align-top transition last:border-r-0 ${
+                            isSelected ? "bg-slate-50" : "bg-white hover:bg-slate-50"
+                          }`}
+                        >
+                          {dayShifts.length > 0 ? (
+                            <div className="space-y-2">
+                              {dayShifts.map((shift: any) => (
+                                <div
+                                  key={shift.id}
+                                  className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
+                                >
+                                  <div className="text-xs font-semibold text-slate-900">
+                                    {shift.start}–{shift.end}
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-slate-500">
+                                    {shift.role}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : isUnavailable ? (
+                            <div className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                              Unavailable
+                            </div>
+                          ) : (
+                            <div className="text-xs text-slate-400">No shift</div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="space-y-3">
         {filteredShifts.length === 0 ? (
