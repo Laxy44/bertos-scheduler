@@ -114,14 +114,23 @@ const defaultNewEmployeeForm: NewEmployeeForm = {
   defaultRole: "Service",
 };
 
+type AppShellProps = {
+  role: string;
+  employeeName: string | null;
+  companyName?: string | null;
+  companyCvr?: string | null;
+};
+
 export default function AppShell({
   role,
   employeeName,
-}: {
-  role: string;
-  employeeName: string | null;
-}) {
-  const isAdmin = role === "admin";
+  companyName,
+  companyCvr,
+}: AppShellProps) {
+  const normalizedRole = (role || "employee").toLowerCase();
+  const isAdmin = ["owner", "admin", "manager"].includes(normalizedRole);
+  const workspaceName = companyName || COMPANY_NAME;
+  const workspaceCvr = companyCvr || COMPANY_CVR;
   const supabase = createClient();
   const router = useRouter();
 
@@ -153,7 +162,7 @@ async function handleLogout() {
       name: emp.name,
       hourlyRate: Number(emp.hourly_rate),
       defaultRole: emp.default_role,
-      unavailableDates: [],
+      unavailableDates: Array.isArray(emp.unavailable_dates) ? emp.unavailable_dates : [],
       active: emp.active,
     }));
 
@@ -1330,8 +1339,8 @@ async function handleLogout() {
 
   function downloadPayrollCsv() {
     const rows = [
-      ["Company", COMPANY_NAME],
-      ["CVR", COMPANY_CVR],
+      ["Company", workspaceName],
+      ["CVR", workspaceCvr],
       ["Month", monthNames[monthFilter]],
       ["Year", String(yearFilter)],
       [],
@@ -1403,8 +1412,8 @@ async function handleLogout() {
         </head>
         <body>
           <div class="header">
-            <h1>${COMPANY_NAME}</h1>
-            <p>CVR: ${COMPANY_CVR}</p>
+            <h1>${workspaceName}</h1>
+            <p>CVR: ${workspaceCvr}</p>
             <p>Payroll Report for ${monthNames[monthFilter]} ${yearFilter}</p>
           </div>
 
@@ -1452,7 +1461,7 @@ async function handleLogout() {
             </tbody>
           </table>
 
-          <p class="total">Generated for ${COMPANY_NAME}</p>
+          <p class="total">Generated for ${workspaceName}</p>
         </body>
       </html>
     `;
@@ -1480,8 +1489,8 @@ async function handleLogout() {
     }
 
     const rows = [
-      ["Company", COMPANY_NAME],
-      ["CVR", COMPANY_CVR],
+      ["Company", workspaceName],
+      ["CVR", workspaceCvr],
       ["Employee", employeeName],
       ["From", employeePeriodFrom || ""],
       ["To", employeePeriodTo || ""],
@@ -1585,8 +1594,8 @@ async function handleLogout() {
       '.footer { margin-top: 24px; }' +
       '</style></head><body>' +
       '<div class="header">' +
-      '<h1>' + COMPANY_NAME + '</h1>' +
-      '<p>CVR: ' + COMPANY_CVR + '</p>' +
+      '<h1>' + workspaceName + '</h1>' +
+      '<p>CVR: ' + workspaceCvr + '</p>' +
       '<p>Employee Period Timesheet</p>' +
       '<p><strong>Employee:</strong> ' + employeeName + '</p>' +
       '<p><strong>Period:</strong> ' + (employeePeriodFrom || '—') + ' to ' + (employeePeriodTo || '—') + '</p>' +
@@ -1600,7 +1609,7 @@ async function handleLogout() {
       '<table><thead><tr><th>Date</th><th>Day</th><th>Role</th><th>Planned</th><th>Planned Hours</th><th>Actual In</th><th>Actual Out</th><th>Worked Hours</th><th>Approved</th><th>Notes</th></tr></thead><tbody>' +
       rowsHtml +
       '</tbody></table>' +
-      '<div class="footer"><p><strong>Prepared by:</strong> ' + COMPANY_NAME + '</p><p><strong>Signature:</strong> ________________________________</p></div>' +
+      '<div class="footer"><p><strong>Prepared by:</strong> ' + workspaceName + '</p><p><strong>Signature:</strong> ________________________________</p></div>' +
       '</body></html>';
 
     const printWindow = window.open("", "_blank", "width=1000,height=800");
@@ -1626,8 +1635,8 @@ async function handleLogout() {
     }
 
     const rows = [
-      ["Company", COMPANY_NAME],
-      ["CVR", COMPANY_CVR],
+      ["Company", workspaceName],
+      ["CVR", workspaceCvr],
       ["Employee", timesheetEmployee],
       ["Month", monthNames[monthFilter]],
       ["Year", String(yearFilter)],
@@ -1713,8 +1722,8 @@ async function handleLogout() {
         </head>
         <body>
           <div class="header">
-            <h1>${COMPANY_NAME}</h1>
-            <p>CVR: ${COMPANY_CVR}</p>
+            <h1>${workspaceName}</h1>
+            <p>CVR: ${workspaceCvr}</p>
             <p>Employee Timesheet</p>
             <p><strong>Employee:</strong> ${timesheetEmployee}</p>
             <p><strong>Period:</strong> ${monthNames[monthFilter]} ${yearFilter}</p>
@@ -1773,7 +1782,7 @@ async function handleLogout() {
           </table>
 
           <div class="footer">
-            <p><strong>Prepared by:</strong> ${COMPANY_NAME}</p>
+            <p><strong>Prepared by:</strong> ${workspaceName}</p>
             <p><strong>Signature:</strong> ________________________________</p>
           </div>
         </body>
@@ -1808,18 +1817,18 @@ async function handleLogout() {
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <p className="text-sm uppercase tracking-[0.25em] text-slate-400">
-                Bertos Gastronomia ApS • Staff Scheduling
+                Planyo • Workspace Dashboard
               </p>
               <h1 className="mt-2 text-3xl font-bold md:text-4xl">
-                {COMPANY_NAME}
+                {workspaceName}
               </h1>
               <p className="mt-2 text-slate-400">
-                Staff Scheduler • CVR: {COMPANY_CVR}
+                Staff Scheduler • CVR: {workspaceCvr}
               </p>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-200 ring-1 ring-white/10">
-                  {isAdmin ? "Admin" : "Employee"}
+                  {normalizedRole}
                 </span>
                 {employeeName ? (
                   <span className="rounded-full bg-white/5 px-3 py-1 text-sm text-slate-300 ring-1 ring-white/10">
@@ -2105,8 +2114,8 @@ async function handleLogout() {
     yearsAvailable={yearsAvailable}
     downloadPayrollCsv={downloadPayrollCsv}
     downloadPayrollPdf={downloadPayrollPdf}
-    COMPANY_NAME={COMPANY_NAME}
-    COMPANY_CVR={COMPANY_CVR}
+    COMPANY_NAME={workspaceName}
+    COMPANY_CVR={workspaceCvr}
     monthlyTotalPlanned={monthlyTotalPlanned}
     monthlyTotalWorked={monthlyTotalWorked}
     monthlyTotalPlannedCost={monthlyTotalPlannedCost}

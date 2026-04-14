@@ -7,25 +7,32 @@ export default async function Page() {
 
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
 
-  if (!user) {
+  if (userError || !user) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
+  let profile: { role?: string | null; name?: string | null } | null = null;
+
+  // Transitional fallback only.
+  // Some environments may not have the final profiles shape yet,
+  // so we fail softly instead of breaking the app at the root page.
+  const profileQuery = await supabase
     .from("profiles")
     .select("role, name")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
+  if (!profileQuery.error) {
+    profile = profileQuery.data;
+  }
+
+  // Temporary fallback until company membership is introduced.
+  // In the SaaS version, role must come from company_members, not profiles.
   const role = profile?.role ?? "employee";
-  const employeeName = profile?.name ?? user.email ?? null;
+  const employeeName = profile?.name ?? user.email ?? "Unknown user";
 
-  return (
-    <AppShell
-      role={role}
-      employeeName={employeeName}
-    />
-  );
+  return <AppShell role={role} employeeName={employeeName} />;
 }
