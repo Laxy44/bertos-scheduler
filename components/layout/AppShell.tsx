@@ -27,7 +27,6 @@ import {
   COMPANY_CVR,
   COMPANY_NAME,
   CUSTOM_ROLE_OPTION,
-  days,
   defaultEmployees,
   monthNames,
   roles,
@@ -37,7 +36,6 @@ import {
   addDays,
   formatDKK,
   formatHours,
-  formatWeekRange,
   fromDateInputValue,
   getCurrentTimeString,
   getDayNameFromDate,
@@ -47,9 +45,7 @@ import {
   getWorkedHours,
   isOverlap,
   isValidFullTime,
-  normalizeEmployeesData,
   normalizeManualTimeInput,
-  normalizeShiftsData,
   roleStyles,
   roundTime,
   sortEmployeesForDisplay,
@@ -66,47 +62,23 @@ import {
   
 
 
-function getISOWeekNumber(date: Date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+
+
+
+
+
+
+
+function createDefaultForm(date: string): FormState {
+  return {
+    employee: defaultEmployees[0].name,
+    role: defaultEmployees[0].defaultRole,
+    start: "10:00",
+    end: "15:00",
+    notes: "",
+    date,
+  };
 }
-
-
-
-function getHours(start: string, end: string) {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-
-  const startMinutes = sh * 60 + sm;
-  let endMinutes = eh * 60 + em;
-
-  if (endMinutes <= startMinutes) {
-    endMinutes += 24 * 60;
-  }
-
-  return (endMinutes - startMinutes) / 60;
-}
-
-
-
-const today = new Date();
-const todayDate = toDateInputValue(today);
-const todayWeekStart = startOfWeek(today);
-const initialWeekDates = getWeekDates(todayWeekStart);
-
-const initialShifts: Shift[] = [];
-
-const defaultForm: FormState = {
-  employee: defaultEmployees[0].name,
-  role: defaultEmployees[0].defaultRole,
-  start: "10:00",
-  end: "15:00",
-  notes: "",
-  date: todayDate,
-};
 
 const defaultNewEmployeeForm: NewEmployeeForm = {
   name: "",
@@ -119,6 +91,7 @@ type AppShellProps = {
   employeeName: string | null;
   companyName?: string | null;
   companyCvr?: string | null;
+  activeCompanyId?: string | null;
 };
 
 export default function AppShell({
@@ -126,6 +99,7 @@ export default function AppShell({
   employeeName,
   companyName,
   companyCvr,
+  activeCompanyId,
 }: AppShellProps) {
   const normalizedRole = (role || "employee").toLowerCase();
   const isAdmin = ["owner", "admin", "manager"].includes(normalizedRole);
@@ -140,6 +114,11 @@ async function handleLogout() {
   router.refresh();
 }
 
+  const today = new Date();
+  const todayDate = toDateInputValue(today);
+  const todayWeekStart = startOfWeek(today);
+  const initialWeekDates = getWeekDates(todayWeekStart);
+
   const currentYear = new Date().getFullYear();
 
   
@@ -151,7 +130,15 @@ async function handleLogout() {
 
   useEffect(() => {
   async function fetchEmployees() {
-    const { data, error } = await supabase.from("employees").select("*");
+    if (!activeCompanyId) {
+      setEmployees([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("employees")
+      .select("*")
+      .eq("company_id", activeCompanyId);
 
     if (error) {
       console.log("Error fetching employees:", error);
@@ -170,9 +157,15 @@ async function handleLogout() {
   }
 
   async function fetchShifts() {
+    if (!activeCompanyId) {
+      setShifts([]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("shifts")
       .select("*")
+      .eq("company_id", activeCompanyId)
       .order("date", { ascending: true })
       .order("start", { ascending: true });
 
@@ -200,11 +193,11 @@ async function handleLogout() {
 
   fetchEmployees();
   fetchShifts();
-}, []);
+}, [activeCompanyId, supabase]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [weekStart, setWeekStart] = useState<Date>(todayWeekStart);
   const [selectedDate, setSelectedDate] = useState(todayDate);
-  const [form, setForm] = useState<FormState>(defaultForm);
+  const [form, setForm] = useState<FormState>(() => createDefaultForm(todayDate));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [employeeFilter, setEmployeeFilter] = useState("All");
   const [copyFromDate, setCopyFromDate] = useState(initialWeekDates[0].date);
@@ -604,6 +597,11 @@ async function handleLogout() {
   }
 
   async function saveShift() {
+    if (!activeCompanyId) {
+      alert("No active company workspace found for this user.");
+      return;
+    }
+
     if (activeEmployees.length === 0) {
       alert("Please add at least one active employee first.");
       return;
@@ -660,6 +658,7 @@ async function handleLogout() {
     const dayName = getDayNameFromDate(form.date);
 
     const payload = {
+      company_id: activeCompanyId,
       employee: form.employee,
       date: form.date,
       start: form.start,
@@ -673,6 +672,7 @@ async function handleLogout() {
         .from("shifts")
         .update(payload)
         .eq("id", editingId)
+        .eq("company_id", activeCompanyId)
         .select()
         .single();
 
@@ -748,7 +748,11 @@ async function handleLogout() {
   }
 
   async function deleteShift(id: string) {
-    const { error } = await supabase.from("shifts").delete().eq("id", id);
+    const { error } = await supabase
+      .from("shifts")
+      .delete()
+      .eq("id", id)
+      .eq("company_id", activeCompanyId);
 
     if (error) {
       alert(`Could not delete shift: ${error.message}`);
@@ -848,7 +852,11 @@ async function handleLogout() {
     );
     if (!ok) return;
 
-    const { error } = await supabase.from("shifts").delete().eq("date", selectedDate);
+    const { error } = await supabase
+      .from("shifts")
+      .delete()
+      .eq("date", selectedDate)
+      .eq("company_id", activeCompanyId);
 
     if (error) {
       alert(`Could not clear shifts: ${error.message}`);
@@ -865,6 +873,7 @@ async function handleLogout() {
       .from("shifts")
       .update({ approved })
       .eq("id", id)
+      .eq("company_id", activeCompanyId)
       .select()
       .single();
 
@@ -1228,6 +1237,7 @@ async function handleLogout() {
       .from("shifts")
       .update({ actual_start: rounded, actual_end: null, approved: false })
       .eq("id", id)
+      .eq("company_id", activeCompanyId)
       .select()
       .single();
 
@@ -1264,6 +1274,7 @@ async function handleLogout() {
       .from("shifts")
       .update({ actual_end: roundedNow, approved: false })
       .eq("id", id)
+      .eq("company_id", activeCompanyId)
       .select()
       .single();
 
@@ -1299,6 +1310,7 @@ async function handleLogout() {
         approved: false,
       })
       .eq("id", id)
+      .eq("company_id", activeCompanyId)
       .select()
       .single();
 
@@ -1385,9 +1397,8 @@ async function handleLogout() {
     link.href = url;
     link.setAttribute(
       "download",
-      `${COMPANY_NAME.replace(/\s+/g, "-").toLowerCase()}-${monthNames[
-        monthFilter
-      ].toLowerCase()}-${yearFilter}-payroll.csv`
+      `${workspaceName.replace(/\s+/g, "-").toLowerCase()}-${monthNames[
+        monthFilter].toLowerCase()}-${yearFilter}-payroll.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -1823,7 +1834,7 @@ async function handleLogout() {
                 {workspaceName}
               </h1>
               <p className="mt-2 text-slate-400">
-                Staff Scheduler • CVR: {workspaceCvr}
+                Staff Scheduler{workspaceCvr ? ` • CVR: ${workspaceCvr}` : ""}
               </p>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">

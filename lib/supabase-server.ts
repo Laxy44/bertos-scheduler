@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-export async function createClient() {
+// Server-side Supabase client.
+// Keep this file focused only on creating the SSR client.
+export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -23,5 +25,7 @@ export async function createClient() {
         },
       },
     }
-  );
-}
+  );}
+
+// Backward-compatible alias while the app is being refactored.
+export const createClient = createServerSupabaseClient;

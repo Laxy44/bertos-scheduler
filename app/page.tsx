@@ -1,6 +1,20 @@
 import { redirect } from "next/navigation";
-import { createClient as createServerSupabaseClient } from "../lib/supabase-server";
+import { createServerSupabaseClient } from "../lib/supabase-server";
 import AppShell from "../components/layout/AppShell";
+
+type ProfileRow = {
+  role?: string | null;
+  name?: string | null;
+};
+
+type CompanyMemberRow = {
+  company_id?: string | null;
+  role?: string | null;
+  companies?: {
+    name?: string | null;
+    cvr?: string | null;
+  } | null;
+};
 
 export default async function Page() {
   const supabase = await createServerSupabaseClient();
@@ -14,11 +28,9 @@ export default async function Page() {
     redirect("/login");
   }
 
-  let profile: { role?: string | null; name?: string | null } | null = null;
+  let profile: ProfileRow | null = null;
+  let membership: CompanyMemberRow | null = null;
 
-  // Transitional fallback only.
-  // Some environments may not have the final profiles shape yet,
-  // so we fail softly instead of breaking the app at the root page.
   const profileQuery = await supabase
     .from("profiles")
     .select("role, name")
@@ -29,10 +41,45 @@ export default async function Page() {
     profile = profileQuery.data;
   }
 
-  // Temporary fallback until company membership is introduced.
-  // In the SaaS version, role must come from company_members, not profiles.
-  const role = profile?.role ?? "employee";
-  const employeeName = profile?.name ?? user.email ?? "Unknown user";
+  // Transitional multi-company lookup.
+  // This safely checks whether the user already belongs to a company workspace.
+  // If the SaaS tables are not ready yet, the app still falls back gracefully.
+  const membershipQuery = await supabase
+    .from("company_members")
+    .select(
+      `
+        company_id,
+        role,
+        companies (
+          name,
+          cvr
+        )
+      `
+    )
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
 
-  return <AppShell role={role} employeeName={employeeName} />;
+  if (!membershipQuery.error) {
+    membership = membershipQuery.data;
+  }
+
+  // During transition:
+  // 1. prefer company_members.role when available
+  // 2. fall back to profiles.role for older data
+  const role = membership?.role ?? profile?.role ?? "employee";
+  const employeeName = profile?.name ?? user.email ?? "Unknown user";
+  const activeCompanyId = membership?.company_id ?? null;
+  const companyName = membership?.companies?.name ?? null;
+  const companyCvr = membership?.companies?.cvr ?? null;
+
+  return (
+    <AppShell
+      role={role}
+      employeeName={employeeName}
+      companyName={companyName}
+      companyCvr={companyCvr}
+      activeCompanyId={activeCompanyId}
+    />
+  );
 }

@@ -1,47 +1,24 @@
 import type { EmployeeConfig } from "../types/schedule";
 
-export const COMPANY_NAME = "Bertos Gastronomia ApS";
-export const COMPANY_CVR = "45080021";
+// Transitional workspace fallbacks only.
+// These values keep the app usable before real multi-company data
+// comes from the database through company/company_members tables.
+export const COMPANY_NAME = "Planyo Workspace";
+export const COMPANY_CVR = "";
 
+// Seed data fallback only.
+// In the SaaS version, employees should come from the database per company.
 export const defaultEmployees: EmployeeConfig[] = [
   {
-    name: "Ali",
+    name: "Employee 1",
     hourlyRate: 140,
     defaultRole: "Kitchen",
     unavailableDates: [],
     active: true,
   },
   {
-    name: "Ram",
+    name: "Employee 2",
     hourlyRate: 135,
-    defaultRole: "Service",
-    unavailableDates: [],
-    active: true,
-  },
-  {
-    name: "Sita",
-    hourlyRate: 130,
-    defaultRole: "Prep",
-    unavailableDates: [],
-    active: true,
-  },
-  {
-    name: "Maya",
-    hourlyRate: 130,
-    defaultRole: "Service",
-    unavailableDates: [],
-    active: true,
-  },
-  {
-    name: "Jonas",
-    hourlyRate: 145,
-    defaultRole: "Delivery",
-    unavailableDates: [],
-    active: true,
-  },
-  {
-    name: "Sara",
-    hourlyRate: 138,
     defaultRole: "Service",
     unavailableDates: [],
     active: true,
@@ -59,7 +36,7 @@ export const days = [
   "Friday",
   "Saturday",
   "Sunday",
-];
+] as const;
 
 export const monthNames = [
   "",
@@ -75,4 +52,4 @@ export const monthNames = [
   "October",
   "November",
   "December",
-];
+] as const;
