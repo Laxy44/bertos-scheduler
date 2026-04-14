@@ -15,16 +15,17 @@ export default async function Page() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, name")
     .eq("id", user.id)
     .single();
 
   const role = profile?.role ?? "employee";
+  const employeeName = profile?.name ?? user.email ?? null;
 
   return (
     <AppShell
       role={role}
-      employeeName={user.email ?? null} // 👈 IMPORTANT FIX
+      employeeName={employeeName}
     />
   );
 }

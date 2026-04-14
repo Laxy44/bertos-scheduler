@@ -1817,6 +1817,17 @@ async function handleLogout() {
                 Staff Scheduler • CVR: {COMPANY_CVR}
               </p>
 
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-200 ring-1 ring-white/10">
+                  {isAdmin ? "Admin" : "Employee"}
+                </span>
+                {employeeName ? (
+                  <span className="rounded-full bg-white/5 px-3 py-1 text-sm text-slate-300 ring-1 ring-white/10">
+                    Signed in as {employeeName}
+                  </span>
+                ) : null}
+              </div>
+
               <div className="mt-3">
                 <button
     onClick={handleLogout}
@@ -2057,6 +2068,7 @@ async function handleLogout() {
     getWorkedHours={getWorkedHours}
     roleStyles={roleStyles}
     weeklyTotals={weeklyTotals}
+    employeeName={employeeName}
   />
 )}
             
@@ -2080,6 +2092,7 @@ async function handleLogout() {
     employees={employees}
     monthlyHours={monthlyHours}
     formatHours={formatHours}
+    employeeName={employeeName}
   />
 )}
             
