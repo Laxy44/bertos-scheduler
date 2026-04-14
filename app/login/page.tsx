@@ -4,9 +4,11 @@ import { login, signup, sendPasswordReset, updatePassword } from "./actions";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createClient } from "../../lib/supabase";
 import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
+  const supabase = createClient();
   const search = useSearchParams();
   const message = search.get("message") || undefined;
 
@@ -23,6 +25,19 @@ export default function LoginPage() {
   const [mode, setMode] = useState<string | undefined>(getInitialMode());
 
   useEffect(() => {
+    // 🔥 FIX: exchange code for session (CRITICAL for recovery)
+    const exchangeSession = async () => {
+      if (typeof window === "undefined") return;
+
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code);
+      }
+    };
+
+    exchangeSession();
     const m = search.get("mode");
 
     if (typeof window !== "undefined") {
