@@ -95,7 +95,7 @@ export default function PayrollSection({
               Planned: {monthlyTotalPlanned.toFixed(1)} hrs
             </p>
             <p className="mt-1 text-lg font-bold text-emerald-700">
-              Actual: {monthlyTotalWorked.toFixed(1)} hrs
+              Approved: {monthlyTotalWorked.toFixed(1)} hrs
             </p>
           </div>
 
@@ -107,7 +107,7 @@ export default function PayrollSection({
               Planned: {formatDKK(monthlyTotalPlannedCost)}
             </p>
             <p className="mt-1 text-lg font-bold">
-              Actual: {formatDKK(monthlyTotalWorkedCost)}
+              Approved: {formatDKK(monthlyTotalWorkedCost)}
             </p>
           </div>
         </div>
@@ -135,7 +135,7 @@ export default function PayrollSection({
                   Planned: {monthlyHours[employee].planned.toFixed(1)} hrs
                 </p>
                 <p className="text-sm text-emerald-700">
-                  Actual: {monthlyHours[employee].worked.toFixed(1)} hrs
+                  Approved: {monthlyHours[employee].worked.toFixed(1)} hrs
                 </p>
                 <p className="mt-3 text-sm text-slate-600">
                   Rate: {employeeRateMap[employee]} DKK/hr
@@ -144,7 +144,7 @@ export default function PayrollSection({
                   Planned cost: {formatDKK(payrollCosts[employee].plannedCost)}
                 </p>
                 <p className="mt-1 text-sm font-semibold text-emerald-700">
-                  Actual cost: {formatDKK(payrollCosts[employee].workedCost)}
+                  Approved cost: {formatDKK(payrollCosts[employee].workedCost)}
                 </p>
               </div>
             );
@@ -206,9 +206,9 @@ export default function PayrollSection({
             </p>
           </div>
           <div className="rounded-2xl bg-emerald-50 p-4">
-            <p className="text-sm text-emerald-700">Actual Hours</p>
+            <p className="text-sm text-emerald-700">Approved Hours</p>
             <p className="mt-1 text-xl font-bold text-emerald-700">
-              {selectedTimesheetSummary.worked.toFixed(1)}
+              {selectedTimesheetRows.filter((s:any)=>s.approved).reduce((sum:number,s:any)=>sum+getWorkedHours(s),0).toFixed(1)}
             </p>
           </div>
         </div>
@@ -224,7 +224,7 @@ export default function PayrollSection({
                 <th className="px-3 py-2">Planned Hours</th>
                 <th className="px-3 py-2">Actual In</th>
                 <th className="px-3 py-2">Actual Out</th>
-                <th className="px-3 py-2">Actual Hours</th>
+                <th className="px-3 py-2">Approved Hours</th>
                 <th className="px-3 py-2">Notes</th>
               </tr>
             </thead>
@@ -251,7 +251,7 @@ export default function PayrollSection({
                     <td className="px-3 py-3">{shift.actualStart || "—"}</td>
                     <td className="px-3 py-3">{shift.actualEnd || "—"}</td>
                     <td className="px-3 py-3 text-emerald-700">
-                      {getWorkedHours(shift).toFixed(1)}
+                      {shift.approved ? getWorkedHours(shift).toFixed(1) : "0.0"}
                     </td>
                     <td className="px-3 py-3">{shift.notes || "—"}</td>
                   </tr>

@@ -183,6 +183,7 @@ async function handleLogout() {
       date: shift.date,
       actualStart: shift.actual_start || undefined,
       actualEnd: shift.actual_end || undefined,
+      approved: shift.approved ?? false,
     }));
 
     setShifts(mappedShifts);
@@ -207,10 +208,15 @@ async function handleLogout() {
     defaultNewEmployeeForm
   );
   const [timesheetEmployee, setTimesheetEmployee] = useState(
-    defaultEmployees[0].name
+    employeeName || defaultEmployees[0].name
   );
   const [shiftRoleMode, setShiftRoleMode] = useState<"preset" | "custom">("preset");
   const [newEmployeeRoleMode, setNewEmployeeRoleMode] = useState<"preset" | "custom">("preset");
+  const [employeePeriodFrom, setEmployeePeriodFrom] = useState(() => {
+    const now = new Date();
+    return toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1));
+  });
+  const [employeePeriodTo, setEmployeePeriodTo] = useState(todayDate);
 
   const sortedEmployeesData = useMemo(
     () => sortEmployeesForDisplay(employees),
@@ -468,6 +474,58 @@ async function handleLogout() {
     );
   }, [payrollCosts]);
 
+  // Employee personal stats (for employee mode)
+  const myStats = useMemo(() => {
+    if (!employeeName) return { planned: 0, worked: 0, approved: 0, shifts: 0 };
+
+    let planned = 0;
+    let worked = 0;
+    let approved = 0;
+    let shiftsCount = 0;
+
+    shifts.forEach((shift) => {
+      if (shift.employee !== employeeName) return;
+
+      shiftsCount += 1;
+      planned += getPlannedHours(shift);
+      worked += getWorkedHours(shift);
+
+      if (shift.approved) {
+        approved += getWorkedHours(shift);
+      }
+    });
+
+    return { planned, worked, approved, shifts: shiftsCount };
+  }, [shifts, employeeName]);
+
+  const employeePeriodRows = useMemo(() => {
+    if (!employeeName) return [];
+
+    return shifts
+      .filter((shift) => {
+        if (shift.employee !== employeeName) return false;
+        if (employeePeriodFrom && shift.date < employeePeriodFrom) return false;
+        if (employeePeriodTo && shift.date > employeePeriodTo) return false;
+        return true;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+  }, [shifts, employeeName, employeePeriodFrom, employeePeriodTo]);
+
+  const employeePeriodStats = useMemo(() => {
+    return employeePeriodRows.reduce(
+      (acc, shift) => {
+        acc.shifts += 1;
+        acc.planned += getPlannedHours(shift);
+        acc.worked += getWorkedHours(shift);
+        if (shift.approved) {
+          acc.approved += getWorkedHours(shift);
+        }
+        return acc;
+      },
+      { shifts: 0, planned: 0, worked: 0, approved: 0 }
+    );
+  }, [employeePeriodRows]);
+
   const yearsAvailable = useMemo(() => {
     const years = new Set<number>();
     years.add(currentYear);
@@ -625,6 +683,7 @@ async function handleLogout() {
         day: dayName,
         actualStart: data.actual_start || undefined,
         actualEnd: data.actual_end || undefined,
+        approved: data.approved ?? false,
       };
 
       setShifts((current) =>
@@ -653,6 +712,7 @@ async function handleLogout() {
         day: dayName,
         actualStart: data.actual_start || undefined,
         actualEnd: data.actual_end || undefined,
+        approved: data.approved ?? false,
       };
 
       setShifts((current) => [...current, newShift]);
@@ -791,21 +851,51 @@ async function handleLogout() {
     );
   }
 
-  function applyPlannedAsActual(shiftId: string) {
+  async function setShiftApproval(id: string, approved: boolean) {
+    const { data, error } = await supabase
+      .from("shifts")
+      .update({ approved })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
     setShifts((current) =>
       current.map((shift) =>
-        shift.id === shiftId
+        shift.id === id
           ? {
               ...shift,
-              actualStart: roundTime(shift.start),
-              actualEnd: roundTime(shift.end),
+              actualStart: data.actual_start || undefined,
+              actualEnd: data.actual_end || undefined,
+              approved: data.approved ?? false,
             }
           : shift
       )
     );
   }
 
-  function applyPlannedToAllSelectedDay() {
+  async function applyPlannedAsActual(shiftId: string) {
+    const targetShift = shifts.find((shift) => shift.id === shiftId);
+
+    if (!targetShift) {
+      alert("Shift not found.");
+      return;
+    }
+
+    try {
+      await updateShiftActualTimes(
+        shiftId,
+        roundTime(targetShift.start),
+        roundTime(targetShift.end)
+      );
+      await setShiftApproval(shiftId, true);
+    } catch (error: any) {
+      alert(`Could not approve shift as planned: ${error.message}`);
+    }
+  }
+
+  async function applyPlannedToAllSelectedDay() {
     const selectedDayShifts = shifts.filter((shift) => shift.date === selectedDate);
 
     if (selectedDayShifts.length === 0) {
@@ -813,17 +903,20 @@ async function handleLogout() {
       return;
     }
 
-    setShifts((current) =>
-      current.map((shift) =>
-        shift.date === selectedDate
-          ? {
-              ...shift,
-              actualStart: roundTime(shift.start),
-              actualEnd: roundTime(shift.end),
-            }
-          : shift
-      )
-    );
+    try {
+      await Promise.all(
+        selectedDayShifts.map(async (shift) => {
+          await updateShiftActualTimes(
+            shift.id,
+            roundTime(shift.start),
+            roundTime(shift.end)
+          );
+          await setShiftApproval(shift.id, true);
+        })
+      );
+    } catch (error: any) {
+      alert(`Could not approve all shifts for this day: ${error.message}`);
+    }
   }
 
   function goToPreviousWeek() {
@@ -1124,7 +1217,7 @@ async function handleLogout() {
 
     const { data, error } = await supabase
       .from("shifts")
-      .update({ actual_start: rounded, actual_end: null })
+      .update({ actual_start: rounded, actual_end: null, approved: false })
       .eq("id", id)
       .select()
       .single();
@@ -1141,6 +1234,7 @@ async function handleLogout() {
               ...shift,
               actualStart: data.actual_start || undefined,
               actualEnd: data.actual_end || undefined,
+              approved: data.approved ?? false,
             }
           : shift
       )
@@ -1159,7 +1253,7 @@ async function handleLogout() {
 
     const { data, error } = await supabase
       .from("shifts")
-      .update({ actual_end: roundedNow })
+      .update({ actual_end: roundedNow, approved: false })
       .eq("id", id)
       .select()
       .single();
@@ -1176,23 +1270,31 @@ async function handleLogout() {
               ...shift,
               actualStart: data.actual_start || undefined,
               actualEnd: data.actual_end || undefined,
+              approved: data.approved ?? false,
             }
           : shift
       )
     );
   }
 
-  async function resetPunch(id: string) {
+  async function updateShiftActualTimes(
+    id: string,
+    actualStart: string | null,
+    actualEnd: string | null
+  ) {
     const { data, error } = await supabase
       .from("shifts")
-      .update({ actual_start: null, actual_end: null })
+      .update({
+        actual_start: actualStart,
+        actual_end: actualEnd,
+        approved: false,
+      })
       .eq("id", id)
       .select()
       .single();
 
     if (error) {
-      alert(`Could not reset actual times: ${error.message}`);
-      return;
+      throw error;
     }
 
     setShifts((current) =>
@@ -1202,10 +1304,21 @@ async function handleLogout() {
               ...shift,
               actualStart: data.actual_start || undefined,
               actualEnd: data.actual_end || undefined,
+              approved: data.approved ?? false,
             }
           : shift
       )
     );
+
+    return data;
+  }
+
+  async function resetPunch(id: string) {
+    try {
+      await updateShiftActualTimes(id, null, null);
+    } catch (error: any) {
+      alert(`Could not reset actual times: ${error.message}`);
+    }
   }
 
   function goToDate(date: string) {
@@ -1255,7 +1368,7 @@ async function handleLogout() {
       ],
     ];
 
-    const csvContent = rows.map((row) => row.join(",")).join("\n");
+    const csvContent = rows.map((row) => row.join(",")).join("\\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
 
@@ -1345,6 +1458,152 @@ async function handleLogout() {
     `;
 
     const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) {
+      alert("Popup blocked. Please allow popups to export PDF.");
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(reportHtml);
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  }
+
+  function downloadMyPeriodTimesheetCsv() {
+    if (!employeeName) {
+      alert("No employee account found.");
+      return;
+    }
+
+    const rows = [
+      ["Company", COMPANY_NAME],
+      ["CVR", COMPANY_CVR],
+      ["Employee", employeeName],
+      ["From", employeePeriodFrom || ""],
+      ["To", employeePeriodTo || ""],
+      [],
+      [
+        "Date",
+        "Day",
+        "Role",
+        "Planned Start",
+        "Planned End",
+        "Planned Hours",
+        "Actual In",
+        "Actual Out",
+        "Worked Hours",
+        "Approved",
+        "Notes",
+      ],
+      ...employeePeriodRows.map((shift) => [
+        shift.date,
+        shift.day,
+        shift.role,
+        shift.start,
+        shift.end,
+        getPlannedHours(shift).toFixed(1),
+        shift.actualStart || "",
+        shift.actualEnd || "",
+        getWorkedHours(shift).toFixed(1),
+        shift.approved ? "Yes" : "No",
+        (shift.notes || "").split(",").join(";"),
+      ]),
+      [],
+      [
+        "Totals",
+        "",
+        "",
+        "",
+        "",
+        employeePeriodStats.planned.toFixed(1),
+        "",
+        "",
+        employeePeriodStats.worked.toFixed(1),
+        employeePeriodStats.approved.toFixed(1),
+        "",
+      ],
+    ];
+
+    const csvContent = rows.map((row) => row.join(",")).join("\\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const safeEmployee = employeeName.split(" ").join("-").toLowerCase();
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      safeEmployee + "-" + (employeePeriodFrom || "from") + "-" + (employeePeriodTo || "to") + "-timesheet.csv"
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function downloadMyPeriodTimesheetPdf() {
+    if (!employeeName) {
+      alert("No employee account found.");
+      return;
+    }
+
+    const employeeRate = employeeRateMap[employeeName] || 0;
+    const approvedPayrollEstimate = employeePeriodStats.approved * employeeRate;
+
+    const rowsHtml = employeePeriodRows.length === 0
+      ? '<tr><td colspan="10">No shifts found for this period.</td></tr>'
+      : employeePeriodRows
+          .map(
+            (shift) =>
+              '<tr>' +
+              '<td>' + shift.date + '</td>' +
+              '<td>' + shift.day + '</td>' +
+              '<td>' + shift.role + '</td>' +
+              '<td>' + shift.start + ' - ' + shift.end + '</td>' +
+              '<td>' + getPlannedHours(shift).toFixed(1) + '</td>' +
+              '<td>' + (shift.actualStart || '—') + '</td>' +
+              '<td>' + (shift.actualEnd || '—') + '</td>' +
+              '<td>' + getWorkedHours(shift).toFixed(1) + '</td>' +
+              '<td>' + (shift.approved ? 'Yes' : 'No') + '</td>' +
+              '<td>' + (shift.notes || '') + '</td>' +
+              '</tr>'
+          )
+          .join('');
+
+    const reportHtml =
+      '<html><head><title>Employee Period Timesheet</title><style>' +
+      'body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }' +
+      'h1, h2, p { margin: 0 0 10px 0; }' +
+      '.header { margin-bottom: 24px; }' +
+      '.summary { margin: 20px 0; padding: 16px; border: 1px solid #d1d5db; border-radius: 12px; }' +
+      'table { width: 100%; border-collapse: collapse; margin-top: 16px; }' +
+      'th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 12px; }' +
+      'th { background: #f3f4f6; }' +
+      '.footer { margin-top: 24px; }' +
+      '</style></head><body>' +
+      '<div class="header">' +
+      '<h1>' + COMPANY_NAME + '</h1>' +
+      '<p>CVR: ' + COMPANY_CVR + '</p>' +
+      '<p>Employee Period Timesheet</p>' +
+      '<p><strong>Employee:</strong> ' + employeeName + '</p>' +
+      '<p><strong>Period:</strong> ' + (employeePeriodFrom || '—') + ' to ' + (employeePeriodTo || '—') + '</p>' +
+      '</div>' +
+      '<div class="summary">' +
+      '<p><strong>Total Planned Hours:</strong> ' + employeePeriodStats.planned.toFixed(1) + ' hrs</p>' +
+      '<p><strong>Total Worked Hours:</strong> ' + employeePeriodStats.worked.toFixed(1) + ' hrs</p>' +
+      '<p><strong>Total Approved Hours:</strong> ' + employeePeriodStats.approved.toFixed(1) + ' hrs</p>' +
+      '<p><strong>Approved Payroll Estimate:</strong> ' + formatDKK(approvedPayrollEstimate) + '</p>' +
+      '</div>' +
+      '<table><thead><tr><th>Date</th><th>Day</th><th>Role</th><th>Planned</th><th>Planned Hours</th><th>Actual In</th><th>Actual Out</th><th>Worked Hours</th><th>Approved</th><th>Notes</th></tr></thead><tbody>' +
+      rowsHtml +
+      '</tbody></table>' +
+      '<div class="footer"><p><strong>Prepared by:</strong> ' + COMPANY_NAME + '</p><p><strong>Signature:</strong> ________________________________</p></div>' +
+      '</body></html>';
+
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
     if (!printWindow) {
       alert("Popup blocked. Please allow popups to export PDF.");
       return;
@@ -1572,27 +1831,115 @@ async function handleLogout() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 md:w-[660px]">
-              <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                <p className="text-sm text-slate-300">Total Shifts</p>
-                <p className="mt-1 text-2xl font-bold">{shifts.length}</p>
-              </div>
-              <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                <p className="text-sm text-slate-300">{selectedDayName} Planned</p>
-                <p className="mt-1 text-2xl font-bold">{dayHours.toFixed(1)}</p>
-              </div>
-              <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                <p className="text-sm text-slate-300">{selectedDayName} Actual</p>
-                <p className="mt-1 text-2xl font-bold">
-                  {dayWorkedHours.toFixed(1)}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                <p className="text-sm text-slate-300">Active Employees</p>
-                <p className="mt-1 text-2xl font-bold">{activeEmployees.length}</p>
-              </div>
+              {isAdmin ? (
+                <>
+                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                    <p className="text-sm text-slate-300">Total Shifts</p>
+                    <p className="mt-1 text-2xl font-bold">{shifts.length}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                    <p className="text-sm text-slate-300">{selectedDayName} Planned</p>
+                    <p className="mt-1 text-2xl font-bold">{dayHours.toFixed(1)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                    <p className="text-sm text-slate-300">{selectedDayName} Actual</p>
+                    <p className="mt-1 text-2xl font-bold">{dayWorkedHours.toFixed(1)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                    <p className="text-sm text-slate-300">Active Employees</p>
+                    <p className="mt-1 text-2xl font-bold">{activeEmployees.length}</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                    <p className="text-sm text-slate-300">My Shifts</p>
+                    <p className="mt-1 text-2xl font-bold">{myStats.shifts}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                    <p className="text-sm text-slate-300">Planned Hours</p>
+                    <p className="mt-1 text-2xl font-bold">{myStats.planned.toFixed(1)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                    <p className="text-sm text-slate-300">Approved Hours</p>
+                    <p className="mt-1 text-2xl font-bold">{myStats.approved.toFixed(1)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                    <p className="text-sm text-slate-300">Worked Hours</p>
+                    <p className="mt-1 text-2xl font-bold">{myStats.worked.toFixed(1)}</p>
+                  </div>
+                </>
+              )}
+            </div>
             </div>
           </div>
-        </div>
+
+        {!isAdmin && employeeName ? (
+          <div className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">My period summary</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Review your own shifts, approved hours, and download your timesheet.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <label className="text-sm text-slate-600">
+                  <span className="mb-1 block font-medium">From</span>
+                  <input
+                    type="date"
+                    value={employeePeriodFrom}
+                    onChange={(e) => setEmployeePeriodFrom(e.target.value)}
+                    className="rounded-xl border border-slate-300 px-3 py-2"
+                  />
+                </label>
+                <label className="text-sm text-slate-600">
+                  <span className="mb-1 block font-medium">To</span>
+                  <input
+                    type="date"
+                    value={employeePeriodTo}
+                    onChange={(e) => setEmployeePeriodTo(e.target.value)}
+                    className="rounded-xl border border-slate-300 px-3 py-2"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
+              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                <p className="text-sm text-slate-500">Period Shifts</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">{employeePeriodStats.shifts}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                <p className="text-sm text-slate-500">Period Planned</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">{employeePeriodStats.planned.toFixed(1)}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                <p className="text-sm text-slate-500">Period Approved</p>
+                <p className="mt-1 text-2xl font-bold text-emerald-700">{employeePeriodStats.approved.toFixed(1)}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                <p className="text-sm text-slate-500">Period Worked</p>
+                <p className="mt-1 text-2xl font-bold text-blue-700">{employeePeriodStats.worked.toFixed(1)}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                onClick={downloadMyPeriodTimesheetCsv}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Download My Timesheet CSV
+              </button>
+              <button
+                onClick={downloadMyPeriodTimesheetPdf}
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+              >
+                Download My Timesheet PDF
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {/* TOP NAVIGATION TABS */}
         <div className="mb-4 flex flex-wrap gap-2">
@@ -1684,6 +2031,8 @@ async function handleLogout() {
     isValidFullTime={isValidFullTime}
     roundTime={roundTime}
     setShifts={setShifts}
+    updateShiftActualTimes={updateShiftActualTimes}
+    setShiftApproval={setShiftApproval}
     applyPlannedAsActual={applyPlannedAsActual}
     startEdit={startEdit}
     deleteShift={deleteShift}
@@ -1692,6 +2041,7 @@ async function handleLogout() {
     getPlannedHours={getPlannedHours}
     getWorkedHours={getWorkedHours}
     isAdmin={isAdmin}
+    employeeName={employeeName}
   />
 )}
             
@@ -1793,4 +2143,6 @@ async function handleLogout() {
     </main>
   );
 }
+
+
 

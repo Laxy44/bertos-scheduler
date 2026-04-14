@@ -18,6 +18,7 @@ export default function MonthSection({
   employees,
   monthlyHours,
   formatHours,
+  employeeName,
 }: any) {
   return (
     <section className="rounded-3xl bg-white p-5 shadow-sm">
@@ -145,9 +146,13 @@ export default function MonthSection({
                           {dayShifts.slice(0, 2).map((shift: any) => (
                             <div
                               key={shift.id}
-                              className={`rounded-lg border px-2 py-1 text-[11px] font-medium ${roleStyles(
-                                shift.role
-                              )}`}
+                              className={`rounded-lg border px-2 py-1 text-[11px] font-medium ${
+                              shift.approved
+                                ? "border-green-300 bg-green-100 text-green-800"
+                                : shift.actualStart || shift.actualEnd
+                                ? "border-blue-300 bg-blue-100 text-blue-800"
+                                : roleStyles(shift.role)
+                            }`}
                             >
                               {shift.employee} {shift.start}-{shift.end}
                             </div>
@@ -178,7 +183,11 @@ export default function MonthSection({
           return (
             <div
               key={employee}
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+              className={`rounded-2xl border p-4 ${
+                employeeName && employee === employeeName
+                  ? "border-blue-300 bg-blue-50"
+                  : "border-slate-200 bg-slate-50"
+              }`}
             >
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold">{employee}</p>

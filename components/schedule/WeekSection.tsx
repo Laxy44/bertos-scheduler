@@ -10,6 +10,7 @@ export default function WeekSection({
   getWorkedHours,
   roleStyles,
   weeklyTotals,
+  employeeName,
 }: any) {
   return (
     <section className="rounded-3xl bg-white p-5 shadow-sm">
@@ -41,7 +42,14 @@ export default function WeekSection({
               );
 
               return (
-                <tr key={employee} className="align-top">
+                <tr
+                  key={employee}
+                  className={`align-top ${
+                    employeeName && employee === employeeName
+                      ? "ring-2 ring-blue-400"
+                      : ""
+                  }`}
+                >
                   <td className="rounded-2xl bg-slate-50 px-3 py-3 font-semibold">
                     <div className="flex flex-col gap-1">
                       <span>{employee}</span>
@@ -90,9 +98,13 @@ export default function WeekSection({
                               {cellShifts.map((shift: any) => (
                                 <div
                                   key={shift.id}
-                                  className={`rounded-xl border px-2 py-2 text-xs font-medium ${roleStyles(
-                                    shift.role
-                                  )}`}
+                                  className={`rounded-xl border px-2 py-2 text-xs font-medium ${
+                                    shift.approved
+                                      ? "border-green-300 bg-green-100 text-green-800"
+                                      : shift.actualStart || shift.actualEnd
+                                      ? "border-blue-300 bg-blue-100 text-blue-800"
+                                      : roleStyles(shift.role)
+                                  }`}
                                 >
                                   <div>
                                     {shift.start} - {shift.end}
