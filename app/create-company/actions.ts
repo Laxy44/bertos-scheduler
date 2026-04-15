@@ -55,6 +55,13 @@ export async function createCompany(formData: FormData) {
     redirect(`/create-company?message=${encodeURIComponent(signUpResult.error.message)}`);
   }
 
+  const hasIdentity = (signUpResult.data.user?.identities || []).length > 0;
+  if (!hasIdentity) {
+    redirect(
+      "/create-company?message=This email is already registered. Log in with that account or use another email."
+    );
+  }
+
   const signInResult = await supabase.auth.signInWithPassword({
     email: ownerEmail,
     password: ownerPassword,

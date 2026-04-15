@@ -105,8 +105,14 @@ export default async function CreateCompanyPage({
         <div className="mt-4 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
           <p className="text-sm font-medium text-slate-700">Invited employees</p>
           <p className="mt-1 text-sm text-slate-600">
-            Employee invitation and acceptance flow will be added in a separate step.
+            Already invited by a company owner? Use join with invite.
           </p>
+          <Link
+            href="/join-invite"
+            className="mt-3 block rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100"
+          >
+            Join with invite
+          </Link>
         </div>
 
         <Link

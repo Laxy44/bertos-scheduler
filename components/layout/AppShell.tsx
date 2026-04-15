@@ -11,6 +11,7 @@ import MonthSection from "../month/MonthSection";
 import PayrollSection from "../payroll/PayrollSection";
 import EmployeesSection from "../employees/EmployeesSection";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 
 
@@ -24,10 +25,7 @@ import type {
 } from "../../types/schedule";
 
 import {
-  COMPANY_CVR,
-  COMPANY_NAME,
   CUSTOM_ROLE_OPTION,
-  defaultEmployees,
   monthNames,
   roles,
 } from "../../lib/constants";
@@ -71,8 +69,8 @@ import {
 
 function createDefaultForm(date: string): FormState {
   return {
-    employee: defaultEmployees[0].name,
-    role: defaultEmployees[0].defaultRole,
+    employee: "",
+    role: "",
     start: "10:00",
     end: "15:00",
     notes: "",
@@ -103,8 +101,8 @@ export default function AppShell({
 }: AppShellProps) {
   const normalizedRole = (role || "employee").toLowerCase();
   const isAdmin = ["owner", "admin", "manager"].includes(normalizedRole);
-  const workspaceName = companyName || COMPANY_NAME;
-  const workspaceCvr = companyCvr || COMPANY_CVR;
+  const workspaceName = companyName || "Workspace";
+  const workspaceCvr = companyCvr || "";
   const supabase = createClient();
   const router = useRouter();
 
@@ -210,9 +208,7 @@ async function handleLogout() {
   const [newEmployeeForm, setNewEmployeeForm] = useState<NewEmployeeForm>(
     defaultNewEmployeeForm
   );
-  const [timesheetEmployee, setTimesheetEmployee] = useState(
-    employeeName || defaultEmployees[0].name
-  );
+  const [timesheetEmployee, setTimesheetEmployee] = useState(employeeName || "");
   const [shiftRoleMode, setShiftRoleMode] = useState<"preset" | "custom">("preset");
   const [newEmployeeRoleMode, setNewEmployeeRoleMode] = useState<"preset" | "custom">("preset");
   const [employeePeriodFrom, setEmployeePeriodFrom] = useState(() => {
@@ -576,12 +572,11 @@ async function handleLogout() {
 
   function resetForm() {
     const firstEmployee = activeEmployees[0];
-    const firstEmployeeName =
-      firstEmployee?.name || employees[0]?.name || "Ali";
+    const firstEmployeeName = firstEmployee?.name || employees[0]?.name || "";
 
     setForm({
       employee: firstEmployeeName,
-      role: employeeRoleMap[firstEmployeeName] || "Kitchen",
+      role: firstEmployeeName ? employeeRoleMap[firstEmployeeName] || "" : "",
       start: "10:00",
       end: "15:00",
       notes: "",
@@ -1912,6 +1907,14 @@ async function handleLogout() {
               </div>
 
               <div className="mt-3">
+                {normalizedRole === "owner" ? (
+                  <Link
+                    href="/invites"
+                    className="mr-2 inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                  >
+                    Invite employees
+                  </Link>
+                ) : null}
                 <button
     onClick={handleLogout}
     className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"

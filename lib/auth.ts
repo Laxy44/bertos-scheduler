@@ -22,7 +22,9 @@ export async function createCompanyForUser(
     .maybeSingle<CompanyMemberRow>();
 
   if (!existingMembership.error && existingMembership.data?.company_id) {
-    return existingMembership.data.company_id;
+    throw new Error(
+      "This account already belongs to an active company. Use a different account to create a new company."
+    );
   }
 
   const companyInsert = await supabase

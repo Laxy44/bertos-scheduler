@@ -6,7 +6,8 @@ export async function proxy(request: NextRequest) {
   const isPublicPath =
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth/callback") ||
-    pathname.startsWith("/create-company");
+    pathname.startsWith("/create-company") ||
+    pathname.startsWith("/join-invite");
 
   let response = NextResponse.next({
     request,
@@ -60,6 +61,7 @@ export async function proxy(request: NextRequest) {
 
     const hasActiveCompany = !membership.error && Boolean(membership.data?.company_id);
     const isCreateCompanyPath = pathname.startsWith("/create-company");
+    const isJoinInvitePath = pathname.startsWith("/join-invite");
 
     if (pathname === "/login") {
       const redirectUrl = request.nextUrl.clone();
@@ -68,14 +70,14 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    if (!hasActiveCompany && !isCreateCompanyPath) {
+    if (!hasActiveCompany && !isCreateCompanyPath && !isJoinInvitePath) {
       const createCompanyUrl = request.nextUrl.clone();
       createCompanyUrl.pathname = "/create-company";
       createCompanyUrl.search = "";
       return NextResponse.redirect(createCompanyUrl);
     }
 
-    if (hasActiveCompany && isCreateCompanyPath) {
+    if (hasActiveCompany && (isCreateCompanyPath || isJoinInvitePath)) {
       const homeUrl = request.nextUrl.clone();
       homeUrl.pathname = "/";
       homeUrl.search = "";

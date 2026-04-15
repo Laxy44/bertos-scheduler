@@ -161,6 +161,13 @@ export function LoginForm({
                 >
                   Create new company
                 </Link>
+
+                <Link
+                  href="/join-invite"
+                  className="mt-2 block text-center text-sm font-medium text-slate-600 hover:text-slate-900"
+                >
+                  Join with invite
+                </Link>
               </div>
             </>
           )}
