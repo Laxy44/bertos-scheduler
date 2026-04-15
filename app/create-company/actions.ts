@@ -3,9 +3,10 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 import { createCompanyForUser } from "../../lib/auth";
+import { getSiteUrl } from "../../lib/site-url";
 
 function getSiteOrigin() {
-  return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  return getSiteUrl();
 }
 
 export async function createCompany(formData: FormData) {

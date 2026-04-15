@@ -9,9 +9,11 @@ export type Shift = {
   date: string;
   actualStart?: string;
   actualEnd?: string;
+  approved?: boolean;
 };
 
 export type EmployeeConfig = {
+  id?: string;
   name: string;
   hourlyRate: number;
   defaultRole: string;

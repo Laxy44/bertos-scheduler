@@ -11,10 +11,16 @@ type CompanyMemberRow = {
   company_id?: string | null;
   role?: string | null;
   status?: string | null;
-  companies?: {
+  companies?:
+    | {
+        name?: string | null;
+        cvr?: string | null;
+      }
+    | {
     name?: string | null;
     cvr?: string | null;
-  } | null;
+      }[]
+    | null;
 };
 
 export default async function Page() {
@@ -73,8 +79,11 @@ export default async function Page() {
   const role = membership?.role ?? profile?.role ?? "employee";
   const employeeName = profile?.name ?? user.email ?? "Unknown user";
   const activeCompanyId = membership?.company_id ?? null;
-  const companyName = membership?.companies?.name ?? null;
-  const companyCvr = membership?.companies?.cvr ?? null;
+  const companyRow = Array.isArray(membership?.companies)
+    ? membership?.companies[0]
+    : membership?.companies;
+  const companyName = companyRow?.name ?? null;
+  const companyCvr = companyRow?.cvr ?? null;
 
   if (!activeCompanyId) {
     redirect("/create-company");
