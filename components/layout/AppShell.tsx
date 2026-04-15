@@ -145,7 +145,8 @@ async function handleLogout() {
       return;
     }
 
-    const mappedEmployees: EmployeeConfig[] = (data || []).map((emp) => ({
+    const mappedEmployees: any[] = (data || []).map((emp) => ({
+      id: emp.id,
       name: emp.name,
       hourlyRate: Number(emp.hourly_rate),
       defaultRole: emp.default_role,
@@ -964,20 +965,48 @@ async function handleLogout() {
     setForm((current) => ({ ...current, date: todayDate }));
   }
 
-  function updateEmployeeRate(name: string, newRate: number) {
-    setEmployees((current) =>
+  async function updateEmployeeRate(name: string, newRate: number) {
+    const emp = employees.find((e: any) => e.name === name);
+    if (!emp) return;
+
+    const safeRate = Number.isNaN(newRate) ? 0 : newRate;
+
+    const { error } = await supabase
+      .from("employees")
+      .update({ hourly_rate: safeRate })
+      .eq("id", emp.id)
+      .eq("company_id", activeCompanyId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setEmployees((current: any[]) =>
       current.map((employee) =>
-        employee.name === name
-          ? { ...employee, hourlyRate: Number.isNaN(newRate) ? 0 : newRate }
-          : employee
+        employee.name === name ? { ...employee, hourlyRate: safeRate } : employee
       )
     );
   }
 
-  function updateEmployeeRole(name: string, newRole: string) {
+  async function updateEmployeeRole(name: string, newRole: string) {
+    const emp = employees.find((e: any) => e.name === name);
+    if (!emp) return;
+
     const trimmedRole = newRole.trim() || "Kitchen";
 
-    setEmployees((current) =>
+    const { error } = await supabase
+      .from("employees")
+      .update({ default_role: trimmedRole })
+      .eq("id", emp.id)
+      .eq("company_id", activeCompanyId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setEmployees((current: any[]) =>
       current.map((employee) =>
         employee.name === name ? { ...employee, defaultRole: trimmedRole } : employee
       )
@@ -1064,12 +1093,11 @@ async function handleLogout() {
     );
   }
 
-  function deleteEmployee(name: string) {
-    const employee = employees.find((item) => item.name === name);
+  async function deleteEmployee(name: string) {
+    const employee = employees.find((item: any) => item.name === name);
     if (!employee) return;
 
     const hasShifts = shifts.some((shift) => shift.employee === name);
-
     if (hasShifts) {
       alert(
         "This employee has shift history, so permanent delete is blocked. Set the employee inactive instead."
@@ -1084,11 +1112,22 @@ async function handleLogout() {
     }
 
     const ok = window.confirm(
-      `Delete employee "${name}" permanently? This cannot be undone.`
+      `Delete employee \"${name}\" permanently? This cannot be undone.`
     );
     if (!ok) return;
 
-    setEmployees((current) =>
+    const { error } = await supabase
+      .from("employees")
+      .delete()
+      .eq("id", employee.id)
+      .eq("company_id", activeCompanyId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setEmployees((current: any[]) =>
       current.filter((employeeItem) => employeeItem.name !== name)
     );
 
@@ -1179,10 +1218,15 @@ async function handleLogout() {
     );
   }
 
-  function addEmployee() {
+  async function addEmployee() {
     const trimmedName = newEmployeeForm.name.trim();
     const hourlyRate = Number(newEmployeeForm.hourlyRate);
     const trimmedRole = newEmployeeForm.defaultRole.trim() || "Service";
+
+    if (!activeCompanyId) {
+      alert("No active company workspace found for this user.");
+      return;
+    }
 
     if (!trimmedName) {
       alert("Please enter employee name.");
@@ -1203,15 +1247,34 @@ async function handleLogout() {
       return;
     }
 
-    const newEmployee: EmployeeConfig = {
-      name: trimmedName,
-      hourlyRate,
-      defaultRole: trimmedRole,
-      unavailableDates: [],
-      active: true,
+    const { data, error } = await supabase
+      .from("employees")
+      .insert({
+        company_id: activeCompanyId,
+        name: trimmedName,
+        hourly_rate: hourlyRate,
+        default_role: trimmedRole,
+        unavailable_dates: [],
+        active: true,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    const newEmployee: any = {
+      id: data.id,
+      name: data.name,
+      hourlyRate: data.hourly_rate,
+      defaultRole: data.default_role,
+      unavailableDates: data.unavailable_dates || [],
+      active: data.active,
     };
 
-    setEmployees((current) => [...current, newEmployee]);
+    setEmployees((current: any[]) => [...current, newEmployee]);
 
     if (activeEmployees.length === 0) {
       setForm((current) => ({
