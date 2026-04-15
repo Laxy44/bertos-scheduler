@@ -10,6 +10,7 @@ type ProfileRow = {
 type CompanyMemberRow = {
   company_id?: string | null;
   role?: string | null;
+  status?: string | null;
   companies?: {
     name?: string | null;
     cvr?: string | null;
@@ -50,6 +51,7 @@ export default async function Page() {
       `
         company_id,
         role,
+        status,
         companies (
           name,
           cvr
@@ -57,6 +59,7 @@ export default async function Page() {
       `
     )
     .eq("user_id", user.id)
+    .eq("status", "active")
     .limit(1)
     .maybeSingle();
 
@@ -72,6 +75,10 @@ export default async function Page() {
   const activeCompanyId = membership?.company_id ?? null;
   const companyName = membership?.companies?.name ?? null;
   const companyCvr = membership?.companies?.cvr ?? null;
+
+  if (!activeCompanyId) {
+    redirect("/create-company");
+  }
 
   return (
     <AppShell

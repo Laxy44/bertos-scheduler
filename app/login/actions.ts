@@ -3,11 +3,19 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 
+function getSiteOrigin() {
+  return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+}
+
 export async function login(formData: FormData) {
   const supabase = await createServerSupabaseClient();
 
   const email = String(formData.get("email") || "");
   const password = String(formData.get("password") || "");
+
+  if (!email || !password) {
+    redirect("/login?message=Email and password are required");
+  }
 
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -21,39 +29,14 @@ export async function login(formData: FormData) {
   redirect("/");
 }
 
-export async function signup(formData: FormData) {
-  const supabase = await createServerSupabaseClient();
-
-  const email = String(formData.get("email") || "");
-  const password = String(formData.get("password") || "");
-
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${origin}/login`,
-    },
-  });
-
-  if (error) {
-    redirect(`/login?message=${encodeURIComponent(error.message)}`);
-  }
-
-  redirect("/login?message=Check your email to confirm your account");
-}
-
 export async function sendPasswordReset(formData: FormData) {
   const supabase = await createServerSupabaseClient();
 
   const email = String(formData.get("email") || "");
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const origin = getSiteOrigin();
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/login?mode=recovery`,
+    redirectTo: `${origin}/auth/callback?next=/login?mode=recovery`,
   });
 
   if (error) {

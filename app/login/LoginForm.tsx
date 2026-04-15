@@ -1,69 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "../../lib/supabase";
 
 type LoginFormProps = {
   loginAction: (formData: FormData) => void | Promise<void>;
-  signupAction: (formData: FormData) => void | Promise<void>;
   sendPasswordResetAction: (formData: FormData) => void | Promise<void>;
   updatePasswordAction: (formData: FormData) => void | Promise<void>;
 };
 
 export function LoginForm({
   loginAction,
-  signupAction,
   sendPasswordResetAction,
   updatePasswordAction,
 }: LoginFormProps) {
-  const supabase = createClient();
   const search = useSearchParams();
   const message = search.get("message") || undefined;
-
-  const getInitialMode = () => {
-    if (typeof window !== "undefined") {
-      const hash = window.location.hash;
-      if (hash && (hash.includes("type=recovery") || hash.includes("access_token"))) {
-        return "recovery";
-      }
-    }
-    return search.get("mode") || undefined;
-  };
-
-  const [mode, setMode] = useState<string | undefined>(getInitialMode());
-
-  useEffect(() => {
-    const exchangeSession = async () => {
-      if (typeof window === "undefined") return;
-
-      const url = new URL(window.location.href);
-      const code = url.searchParams.get("code");
-
-      if (code) {
-        await supabase.auth.exchangeCodeForSession(code);
-      }
-    };
-
-    exchangeSession();
-    const nextMode = search.get("mode");
-
-    if (typeof window !== "undefined") {
-      const hash = window.location.hash;
-      if (hash && (hash.includes("type=recovery") || hash.includes("access_token"))) {
-        setMode("recovery");
-        return;
-      }
-    }
-
-    if (nextMode) {
-      setMode(nextMode);
-      return;
-    }
-
-    setMode(undefined);
-  }, [search, supabase]);
+  const hash = typeof window !== "undefined" ? window.location.hash : "";
+  const mode =
+    hash && (hash.includes("type=recovery") || hash.includes("access_token"))
+      ? "recovery"
+      : (search.get("mode") ?? undefined);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
@@ -180,21 +137,12 @@ export function LoginForm({
             </div>
           ) : (
             <>
-              <div className="flex gap-3">
-                <button
-                  formAction={loginAction}
-                  className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-800"
-                >
-                  Login
-                </button>
-
-                <button
-                  formAction={signupAction}
-                  className="flex-1 rounded-2xl bg-white px-4 py-3 font-semibold text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50"
-                >
-                  Sign up
-                </button>
-              </div>
+              <button
+                formAction={loginAction}
+                className="w-full rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-800"
+              >
+                Login
+              </button>
 
               <Link
                 href="/login?mode=forgot"
@@ -202,6 +150,18 @@ export function LoginForm({
               >
                 Forgot password?
               </Link>
+
+              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                <p className="text-sm text-slate-600">
+                  New business owner? Start your workspace setup.
+                </p>
+                <Link
+                  href="/create-company"
+                  className="mt-3 block rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100"
+                >
+                  Create new company
+                </Link>
+              </div>
             </>
           )}
         </form>
