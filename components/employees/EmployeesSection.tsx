@@ -21,14 +21,94 @@ export default function EmployeesSection({
   addUnavailableDate,
   removeUnavailableDate,
 }: any) {
-  const [employeeMode, setEmployeeMode] = useState<"add" | "invite">("add");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  function handleInviteSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const [modalForm, setModalForm] = useState({
+    firstName: "",
+    surname: "",
+    email: "",
+    role: "employee",
+    hourlyRate: "130",
+    phone: "",
+    visibleToOthers: false,
+    birthday: "",
+    hireDate: "",
+    inviteToPlanyo: false,
+    sendWelcome: false,
+  });
+
+  function openModal() {
+    setStatusMessage(null);
+    setErrorMessage(null);
+    setIsModalOpen(true);
+  }
+
+  function closeModal() {
+    if (isSubmitting) return;
+    setIsModalOpen(false);
+  }
+
+  async function handleCreateEmployee(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // Placeholder for future wiring to real invite flow.
-    // Keeps the page functional without changing backend logic.
-    // eslint-disable-next-line no-alert
-    alert("Invite flow will be connected here");
+    setStatusMessage(null);
+    setErrorMessage(null);
+
+    const trimmedFirst = modalForm.firstName.trim();
+    const trimmedSurname = modalForm.surname.trim();
+    const name = [trimmedFirst, trimmedSurname].filter(Boolean).join(" ").trim();
+    const hourlyRate = Number(modalForm.hourlyRate);
+
+    if (!name) {
+      setErrorMessage("Please enter at least a first name or surname.");
+      return;
+    }
+    if (Number.isNaN(hourlyRate) || hourlyRate < 0) {
+      setErrorMessage("Please enter a valid hourly rate.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Map rich form fields into the existing newEmployeeForm structure.
+      setNewEmployeeForm((current: any) => ({
+        ...current,
+        name,
+        hourlyRate: String(hourlyRate),
+        defaultRole: modalForm.role || current.defaultRole,
+      }));
+
+      // Reuse existing addEmployee logic (includes company_id + state updates).
+      await addEmployee();
+
+      // NOTE: Invite to Planyo is UI-only for now; wiring to the real invite
+      // flow should reuse the existing invite actions in /invites.
+      if (modalForm.inviteToPlanyo && modalForm.email.trim()) {
+        console.log("[employees] inviteToPlanyo checked for", modalForm.email.trim());
+      }
+
+      setStatusMessage("Employee added successfully.");
+      setModalForm((current) => ({
+        ...current,
+        firstName: "",
+        surname: "",
+        email: "",
+        hourlyRate: "130",
+        phone: "",
+        birthday: "",
+        hireDate: "",
+        inviteToPlanyo: current.inviteToPlanyo,
+        sendWelcome: current.sendWelcome,
+      }));
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error("Error creating employee:", error);
+      setErrorMessage("Failed to add employee. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -44,180 +124,244 @@ export default function EmployeesSection({
       <section className="mb-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 className="text-lg font-bold">Team access & staffing</h3>
+            <h3 className="text-lg font-bold">Employees</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Choose whether you are adding staff for scheduling or inviting them
-              to log in to Planyo.
+              Create staff records for scheduling. You can also optionally invite them
+              to access Planyo.
             </p>
           </div>
-          <div className="inline-flex rounded-2xl bg-slate-100 p-1">
+          <div>
             <button
               type="button"
-              onClick={() => setEmployeeMode("add")}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold ${
-                employeeMode === "add"
-                  ? "bg-slate-900 text-white"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-              }`}
+              onClick={openModal}
+              className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
             >
-              Add employee
-            </button>
-            <button
-              type="button"
-              onClick={() => setEmployeeMode("invite")}
-              className={`ml-1 rounded-2xl px-4 py-2 text-sm font-semibold ${
-                employeeMode === "invite"
-                  ? "bg-slate-900 text-white"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-              }`}
-            >
-              Invite employee
+              Create employee
             </button>
           </div>
         </div>
 
-        {employeeMode === "add" && (
-          <>
-            <p className="mt-4 text-sm text-slate-500">
-              Use this to add staff for scheduling (no login required).
-            </p>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium">Name</label>
-                <input
-                  value={newEmployeeForm.name}
-                  onChange={(e) =>
-                    setNewEmployeeForm((current: any) => ({
-                      ...current,
-                      name: e.target.value,
-                    }))
-                  }
-                  placeholder="Employee name"
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                />
-              </div>
+        {statusMessage ? (
+          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
+            {statusMessage}
+          </div>
+        ) : null}
+      </section>
 
+      {isModalOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Hourly Rate (DKK)
-                </label>
-                <input
-                  type="number"
-                  value={newEmployeeForm.hourlyRate}
-                  onChange={(e) =>
-                    setNewEmployeeForm((current: any) => ({
-                      ...current,
-                      hourlyRate: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                />
+                <h3 className="text-xl font-bold text-slate-900">Create employee</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Use this form to add a staff member for scheduling. You can also send
+                  an invite so they can log in to Planyo.
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+              >
+                Esc
+              </button>
+            </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Default Role
-                </label>
-                <div className="space-y-2">
-                  <select
-                    value={
-                      newEmployeeRoleMode === "custom"
-                        ? CUSTOM_ROLE_OPTION
-                        : newEmployeeForm.defaultRole
+            {errorMessage ? (
+              <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+                {errorMessage}
+              </div>
+            ) : null}
+
+            <form onSubmit={handleCreateEmployee} className="mt-4 space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium">First name</label>
+                  <input
+                    value={modalForm.firstName}
+                    onChange={(e) =>
+                      setModalForm((current) => ({ ...current, firstName: e.target.value }))
                     }
-                    onChange={(e) => {
-                      if (e.target.value === CUSTOM_ROLE_OPTION) {
-                        setNewEmployeeRoleMode("custom");
-                        setNewEmployeeForm((current: any) => ({
-                          ...current,
-                          defaultRole:
-                            current.defaultRole &&
-                            !roleSuggestions.includes(current.defaultRole)
-                              ? current.defaultRole
-                              : "",
-                        }));
-                        return;
-                      }
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+                    placeholder="First name"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Surname</label>
+                  <input
+                    value={modalForm.surname}
+                    onChange={(e) =>
+                      setModalForm((current) => ({ ...current, surname: e.target.value }))
+                    }
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+                    placeholder="Surname"
+                  />
+                </div>
+              </div>
 
-                      setNewEmployeeRoleMode("preset");
-                      setNewEmployeeForm((current: any) => ({
-                        ...current,
-                        defaultRole: e.target.value,
-                      }));
-                    }}
-                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Email (used for invite)
+                  </label>
+                  <input
+                    type="email"
+                    value={modalForm.email}
+                    onChange={(e) =>
+                      setModalForm((current) => ({ ...current, email: e.target.value }))
+                    }
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+                    placeholder="employee@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Mobile (optional)</label>
+                  <input
+                    value={modalForm.phone}
+                    onChange={(e) =>
+                      setModalForm((current) => ({ ...current, phone: e.target.value }))
+                    }
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+                    placeholder="+45 12 34 56 78"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Role</label>
+                  <select
+                    value={modalForm.role}
+                    onChange={(e) =>
+                      setModalForm((current) => ({ ...current, role: e.target.value }))
+                    }
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                   >
                     {roleSuggestions.map((role: string) => (
                       <option key={role} value={role}>
                         {role}
                       </option>
                     ))}
-                    <option value={CUSTOM_ROLE_OPTION}>Custom role…</option>
                   </select>
-
-                  {newEmployeeRoleMode === "custom" ? (
-                    <input
-                      value={newEmployeeForm.defaultRole}
-                      onChange={(e) =>
-                        setNewEmployeeForm((current: any) => ({
-                          ...current,
-                          defaultRole: e.target.value,
-                        }))
-                      }
-                      placeholder="Write default role"
-                      className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                    />
-                  ) : null}
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Hourly rate (DKK)
+                  </label>
+                  <input
+                    type="number"
+                    value={modalForm.hourlyRate}
+                    onChange={(e) =>
+                      setModalForm((current) => ({ ...current, hourlyRate: e.target.value }))
+                    }
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="mb-1 block text-sm font-medium">
+                    Visibility & dates (optional)
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={modalForm.visibleToOthers}
+                        onChange={(e) =>
+                          setModalForm((current) => ({
+                            ...current,
+                            visibleToOthers: e.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                      />
+                      Visible to other employees
+                    </label>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="mt-4">
-              <button
-                onClick={addEmployee}
-                className="rounded-2xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800"
-              >
-                Add Employee
-              </button>
-            </div>
-          </>
-        )}
-
-        {employeeMode === "invite" && (
-          <form onSubmit={handleInviteSubmit} className="mt-4 space-y-4">
-            <p className="text-sm text-slate-500">
-              Invite a team member to access Planyo.
-            </p>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium">Email</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="teammember@example.com"
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                />
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Birthday (optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={modalForm.birthday}
+                    onChange={(e) =>
+                      setModalForm((current) => ({ ...current, birthday: e.target.value }))
+                    }
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    Hire date (optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={modalForm.hireDate}
+                    onChange={(e) =>
+                      setModalForm((current) => ({ ...current, hireDate: e.target.value }))
+                    }
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Role</label>
-                <select
-                  defaultValue="employee"
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+
+              <div className="space-y-2 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={modalForm.inviteToPlanyo}
+                    onChange={(e) =>
+                      setModalForm((current) => ({
+                        ...current,
+                        inviteToPlanyo: e.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                  />
+                  <span>Invite to Planyo (uses this email when wired)</span>
+                </label>
+                <label className="inline-flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={modalForm.sendWelcome}
+                    onChange={(e) =>
+                      setModalForm((current) => ({
+                        ...current,
+                        sendWelcome: e.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                  />
+                  <span>Send welcome message (placeholder only)</span>
+                </label>
+              </div>
+
+              <div className="mt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  disabled={isSubmitting}
+                  className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                 >
-                  <option value="employee">employee</option>
-                  <option value="admin">admin</option>
-                </select>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="rounded-2xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {isSubmitting ? "Saving…" : "Save employee"}
+                </button>
               </div>
-            </div>
-            <button
-              type="submit"
-              className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
-            >
-              Send invite
-            </button>
-          </form>
-        )}
-      </section>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4">
         {sortedEmployeesData.map((employee: any) => (
