@@ -1,13 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { authDebug } from "./lib/auth-debug";
+
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
+  const loginMode = searchParams.get("mode");
+  const isRecoveryMode = pathname === "/login" && loginMode === "recovery";
   const isPublicPath =
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/auth/error") ||
     pathname.startsWith("/create-company") ||
-    pathname.startsWith("/join-invite");
+    pathname.startsWith("/join-invite") ||
+    pathname.startsWith("/complete-account") ||
+    pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/workspace-conflict");
 
   let response = NextResponse.next({
     request,
@@ -36,9 +44,36 @@ export async function proxy(request: NextRequest) {
     }
   );
 
+  // PKCE: exchange code in middleware so session cookies exist before the callback page runs.
+  // Avoids races where the client had not finished exchange and a navigation hit protected routes.
+  const authCode = searchParams.get("code");
+  if (pathname === "/auth/callback" && authCode) {
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
+    if (exchangeError) {
+      const errUrl = request.nextUrl.clone();
+      errUrl.pathname = "/auth/error";
+      errUrl.search = "";
+      errUrl.searchParams.set("message", exchangeError.message);
+      return NextResponse.redirect(errUrl);
+    }
+  }
+
+  // Refresh session from cookies so getUser() and downstream routes see an up-to-date session.
+  await supabase.auth.getSession();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const isAuthCompletionPath =
+    pathname.startsWith("/complete-account") || pathname.startsWith("/reset-password");
+
+  authDebug("proxy", {
+    pathname,
+    hasUser: Boolean(user),
+    isAuthCompletionPath,
+    hasAuthCode: Boolean(authCode),
+  });
 
   if (!user && !isPublicPath) {
     const loginUrl = request.nextUrl.clone();
@@ -51,33 +86,50 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user) {
-    const membership = await supabase
+    const memberships = await supabase
       .from("company_members")
       .select("company_id")
       .eq("user_id", user.id)
       .eq("status", "active")
-      .limit(1)
-      .maybeSingle<{ company_id: string | null }>();
+      .order("company_id", { ascending: true })
+      .limit(2);
 
-    const hasActiveCompany = !membership.error && Boolean(membership.data?.company_id);
+    const activeMemberships = memberships.error ? [] : memberships.data || [];
+    // Do not block password reset or invite completion when the user has multiple workspaces.
+    if (activeMemberships.length > 1 && !isAuthCompletionPath) {
+      const conflictUrl = request.nextUrl.clone();
+      conflictUrl.pathname = "/workspace-conflict";
+      conflictUrl.search = "";
+      return NextResponse.redirect(conflictUrl);
+    }
+
+    const hasActiveCompany = Boolean(activeMemberships[0]?.company_id);
     const isCreateCompanyPath = pathname.startsWith("/create-company");
     const isJoinInvitePath = pathname.startsWith("/join-invite");
+    const isCompleteAccountPath = pathname.startsWith("/complete-account");
+    const isResetPasswordPath = pathname.startsWith("/reset-password");
 
-    if (pathname === "/login") {
+    if (pathname === "/login" && !isRecoveryMode) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = hasActiveCompany ? "/" : "/create-company";
       redirectUrl.search = "";
       return NextResponse.redirect(redirectUrl);
     }
 
-    if (!hasActiveCompany && !isCreateCompanyPath && !isJoinInvitePath) {
+    if (
+      !hasActiveCompany &&
+      !isCreateCompanyPath &&
+      !isJoinInvitePath &&
+      !isCompleteAccountPath &&
+      !isResetPasswordPath
+    ) {
       const createCompanyUrl = request.nextUrl.clone();
       createCompanyUrl.pathname = "/create-company";
       createCompanyUrl.search = "";
       return NextResponse.redirect(createCompanyUrl);
     }
 
-    if (hasActiveCompany && (isCreateCompanyPath || isJoinInvitePath)) {
+    if (hasActiveCompany && (isCreateCompanyPath || isJoinInvitePath || isCompleteAccountPath)) {
       const homeUrl = request.nextUrl.clone();
       homeUrl.pathname = "/";
       homeUrl.search = "";

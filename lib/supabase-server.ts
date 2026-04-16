@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
 
-  return createServerClient(
+  const client = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -25,7 +25,13 @@ export async function createServerSupabaseClient() {
         },
       },
     }
-  );}
+  );
+
+  // Hydrate in-memory session from cookie storage so getUser/updateUser see the same session.
+  await client.auth.getSession();
+
+  return client;
+}
 
 // Backward-compatible alias while the app is being refactored.
 export const createClient = createServerSupabaseClient;

@@ -63,6 +63,7 @@ export async function getActiveMembership(
     .select("company_id")
     .eq("user_id", userId)
     .eq("status", "active")
+    .order("company_id", { ascending: true })
     .limit(1)
     .maybeSingle<CompanyMemberRow>();
 

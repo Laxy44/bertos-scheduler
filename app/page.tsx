@@ -66,11 +66,15 @@ export default async function Page() {
     )
     .eq("user_id", user.id)
     .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
+    .order("company_id", { ascending: true })
+    .limit(2);
 
   if (!membershipQuery.error) {
-    membership = membershipQuery.data;
+    const rows = membershipQuery.data || [];
+    if (rows.length > 1) {
+      redirect("/workspace-conflict");
+    }
+    membership = rows[0] ?? null;
   }
 
   // During transition:

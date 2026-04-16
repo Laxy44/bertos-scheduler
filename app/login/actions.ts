@@ -1,11 +1,21 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { buildRecoveryEmailRedirectUrl } from "../../lib/auth-callback-urls";
+import { authDebug } from "../../lib/auth-debug";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 import { getSiteUrl } from "../../lib/site-url";
 
 function getSiteOrigin() {
   return getSiteUrl();
+}
+
+function authErrorMessage(message: string) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("invalid login credentials")) {
+    return "This email exists, but the password is incorrect. Try again or reset your password.";
+  }
+  return message;
 }
 
 export async function login(formData: FormData) {
@@ -24,7 +34,7 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/login?message=${encodeURIComponent(error.message)}`);
+    redirect(`/login?message=${encodeURIComponent(authErrorMessage(error.message))}`);
   }
 
   redirect("/");
@@ -36,8 +46,9 @@ export async function sendPasswordReset(formData: FormData) {
   const email = String(formData.get("email") || "");
   const origin = getSiteOrigin();
 
+  // Supabase Dashboard → Authentication → URL Configuration: allowlist …/auth/callback.
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=/login?mode=recovery`,
+    redirectTo: buildRecoveryEmailRedirectUrl(origin),
   });
 
   if (error) {
@@ -53,13 +64,20 @@ export async function sendPasswordReset(formData: FormData) {
 
 export async function updatePassword(formData: FormData) {
   const supabase = await createServerSupabaseClient();
+  const {
+    data: { user: actionUser },
+  } = await supabase.auth.getUser();
+  authDebug("updatePassword server action", {
+    hasUser: Boolean(actionUser),
+    userId: actionUser?.id ?? null,
+  });
 
   const password = String(formData.get("password") || "");
   const confirmPassword = String(formData.get("confirmPassword") || "");
 
   if (!password || password.length < 6) {
     redirect(
-      `/login?message=${encodeURIComponent(
+      `/reset-password?message=${encodeURIComponent(
         "Password must be at least 6 characters"
       )}`
     );
@@ -67,7 +85,7 @@ export async function updatePassword(formData: FormData) {
 
   if (password !== confirmPassword) {
     redirect(
-      `/login?message=${encodeURIComponent("Passwords do not match")}`
+      `/reset-password?message=${encodeURIComponent("Passwords do not match")}`
     );
   }
 
@@ -76,12 +94,12 @@ export async function updatePassword(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/login?message=${encodeURIComponent(error.message)}`);
+    redirect(`/reset-password?message=${encodeURIComponent(error.message)}`);
   }
 
   redirect(
     `/login?message=${encodeURIComponent(
-      "Password updated successfully. Please log in."
+      "Password updated. Sign in with your new password."
     )}`
   );
 }

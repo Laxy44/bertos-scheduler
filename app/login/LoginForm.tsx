@@ -6,34 +6,26 @@ import { useSearchParams } from "next/navigation";
 type LoginFormProps = {
   loginAction: (formData: FormData) => void | Promise<void>;
   sendPasswordResetAction: (formData: FormData) => void | Promise<void>;
-  updatePasswordAction: (formData: FormData) => void | Promise<void>;
 };
 
 export function LoginForm({
   loginAction,
   sendPasswordResetAction,
-  updatePasswordAction,
 }: LoginFormProps) {
   const search = useSearchParams();
   const message = search.get("message") || undefined;
-  const hash = typeof window !== "undefined" ? window.location.hash : "";
-  const mode =
-    hash && (hash.includes("type=recovery") || hash.includes("access_token"))
-      ? "recovery"
-      : (search.get("mode") ?? undefined);
+  const mode = search.get("mode") ?? undefined;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-bold text-slate-900">
-          {mode === "forgot" || mode === "recovery" ? "Reset password" : "Login"}
+          {mode === "forgot" ? "Reset password" : "Login"}
         </h1>
         <p className="mt-2 text-sm text-slate-500">
           {mode === "forgot"
             ? "Enter your email and we’ll send you a password reset link"
-            : mode === "recovery"
-              ? "Enter your new password"
-              : "Sign in to access Planyo"}
+            : "Sign in to access Planyo"}
         </p>
 
         {message ? (
@@ -48,27 +40,27 @@ export function LoginForm({
           </div>
         ) : null}
 
-        <form className="mt-6 space-y-4">
-          {mode !== "recovery" ? (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
-              <input
-                name="email"
-                type="email"
-                required
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                placeholder="you@example.com"
-              />
-            </div>
-          ) : null}
+        <form className="mt-6 space-y-4" autoComplete="off">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
+            <input
+              name="email"
+              type="email"
+              required
+              autoComplete={mode === "forgot" ? "email" : "off"}
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+              placeholder="you@example.com"
+            />
+          </div>
 
-          {mode !== "forgot" && mode !== "recovery" ? (
+          {mode !== "forgot" ? (
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Password</label>
               <input
                 name="password"
                 type="password"
                 required
+                autoComplete="new-password"
                 className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
                 placeholder="Your password"
               />
@@ -90,50 +82,6 @@ export function LoginForm({
               >
                 Back to login
               </Link>
-            </div>
-          ) : mode === "recovery" ? (
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  New Password
-                </label>
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-                  placeholder="Enter new password"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Confirm Password
-                </label>
-                <input
-                  name="confirmPassword"
-                  type="password"
-                  required
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-                  placeholder="Confirm password"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  formAction={updatePasswordAction}
-                  className="w-full rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-500"
-                >
-                  Update Password
-                </button>
-
-                <Link
-                  href="/login"
-                  className="block text-center text-sm font-medium text-slate-600 hover:text-slate-900"
-                >
-                  Back to login
-                </Link>
-              </div>
             </div>
           ) : (
             <>
@@ -163,7 +111,7 @@ export function LoginForm({
                 </Link>
 
                 <Link
-                  href="/join-invite"
+                  href="/complete-account"
                   className="mt-2 block text-center text-sm font-medium text-slate-600 hover:text-slate-900"
                 >
                   Join with invite

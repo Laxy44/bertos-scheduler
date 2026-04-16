@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 import { createCompanyForUser } from "../../lib/auth";
+import { buildSignupEmailRedirectUrl } from "../../lib/auth-callback-urls";
 import { getSiteUrl } from "../../lib/site-url";
 
 function getSiteOrigin() {
@@ -48,7 +49,7 @@ export async function createCompany(formData: FormData) {
     email: ownerEmail,
     password: ownerPassword,
     options: {
-      emailRedirectTo: `${origin}/auth/callback?next=/create-company`,
+      emailRedirectTo: buildSignupEmailRedirectUrl(origin),
     },
   });
 

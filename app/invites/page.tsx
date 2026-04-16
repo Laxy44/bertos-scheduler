@@ -1,17 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
-import { createInvite } from "./actions";
+import { cancelInvite, createInvite, resendInvite } from "./actions";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-type ActiveMembership = {
-  company_id: string | null;
-  role: string | null;
-  companies: {
-    name: string | null;
-  } | null;
-};
 
 function readParam(value: string | string[] | undefined) {
   if (!value) return undefined;
@@ -48,14 +40,28 @@ export default async function InvitesPage({
     )
     .eq("user_id", user.id)
     .eq("status", "active")
-    .limit(1)
-    .maybeSingle<ActiveMembership>();
+    .order("company_id", { ascending: true })
+    .limit(2);
 
-  if (membership.error || !membership.data?.company_id) {
+  if (membership.error || !(membership.data || []).length) {
     redirect("/create-company?message=Create a company first");
   }
 
-  const role = (membership.data.role || "").toLowerCase();
+  if ((membership.data || []).length > 1) {
+    redirect("/workspace-conflict");
+  }
+
+  const activeMembership = membership.data![0];
+  const companyRow = activeMembership.companies as
+    | { name: string | null }
+    | { name: string | null }[]
+    | null
+    | undefined;
+  const companyName = Array.isArray(companyRow)
+    ? companyRow[0]?.name
+    : companyRow?.name;
+
+  const role = (activeMembership.role || "").toLowerCase();
   if (!["owner", "admin"].includes(role)) {
     redirect("/?message=Only company owners or admins can manage invites");
   }
@@ -63,7 +69,7 @@ export default async function InvitesPage({
   const pendingInvites = await supabase
     .from("invites")
     .select("id, email, role, status, created_at")
-    .eq("company_id", membership.data.company_id)
+    .eq("company_id", activeMembership.company_id)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
@@ -72,7 +78,7 @@ export default async function InvitesPage({
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-bold text-slate-900">Employee Invites</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Company: {membership.data.companies?.name || "Workspace"}
+          Company: {companyName || "Workspace"}
         </p>
 
         {message ? (
@@ -105,7 +111,6 @@ export default async function InvitesPage({
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
             >
               <option value="employee">employee</option>
-              <option value="manager">manager</option>
               <option value="admin">admin</option>
             </select>
           </div>
@@ -125,9 +130,32 @@ export default async function InvitesPage({
               <p>No pending invites yet.</p>
             ) : (
               pendingInvites.data?.map((invite) => (
-                <p key={invite.id}>
-                  {invite.email} - {invite.role}
-                </p>
+                <div key={invite.id} className="flex items-center justify-between gap-3">
+                  <p className="truncate flex-1">
+                    {invite.email} - {invite.role} ({invite.status})
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <form action={resendInvite}>
+                      <input type="hidden" name="inviteId" value={invite.id} />
+                      <input type="hidden" name="inviteEmail" value={invite.email} />
+                      <button
+                        type="submit"
+                        className="rounded-xl bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"
+                      >
+                        Resend
+                      </button>
+                    </form>
+                    <form action={cancelInvite}>
+                      <input type="hidden" name="inviteId" value={invite.id} />
+                      <button
+                        type="submit"
+                        className="rounded-xl bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  </div>
+                </div>
               ))
             )}
           </div>

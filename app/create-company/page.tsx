@@ -47,7 +47,7 @@ export default async function CreateCompanyPage({
           </div>
         ) : null}
 
-        <form action={createCompany} className="mt-6 space-y-4">
+        <form action={createCompany} className="mt-6 space-y-4" autoComplete="off">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Company Name
@@ -56,6 +56,7 @@ export default async function CreateCompanyPage({
               name="companyName"
               type="text"
               required
+              autoComplete="off"
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
               placeholder="Your Company ApS"
             />
@@ -71,6 +72,7 @@ export default async function CreateCompanyPage({
                   name="email"
                   type="email"
                   required
+                  autoComplete="off"
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
                   placeholder="owner@company.com"
                 />
@@ -83,6 +85,7 @@ export default async function CreateCompanyPage({
                   name="password"
                   type="password"
                   required
+                  autoComplete="new-password"
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
                   placeholder="Create a secure password"
                 />
@@ -108,7 +111,7 @@ export default async function CreateCompanyPage({
             Already invited by a company owner? Use join with invite.
           </p>
           <Link
-            href="/join-invite"
+            href="/complete-account"
             className="mt-3 block rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100"
           >
             Join with invite
