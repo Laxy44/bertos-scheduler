@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
+import { sendAccountReadyEmail } from "../../lib/account-ready-email";
 import { buildInviteEmailRedirectUrl } from "../../lib/auth-callback-urls";
 import { authDebug } from "../../lib/auth-debug";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
@@ -111,6 +112,13 @@ async function acceptInviteForUser(
   if (updateInvite.error) {
     redirect(`${ACCOUNT_PATH}?message=${encodeURIComponent(updateInvite.error.message)}`);
   }
+
+  void sendAccountReadyEmail({ to: email }).catch((error) => {
+    console.error("[account-ready-email] failed to send", {
+      email,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
 
   redirect("/");
 }
