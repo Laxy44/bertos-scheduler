@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 export default function EmployeesSection({
   sortedEmployeesData,
   newEmployeeForm,
@@ -19,6 +21,16 @@ export default function EmployeesSection({
   addUnavailableDate,
   removeUnavailableDate,
 }: any) {
+  const [employeeMode, setEmployeeMode] = useState<"add" | "invite">("add");
+
+  function handleInviteSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    // Placeholder for future wiring to real invite flow.
+    // Keeps the page functional without changing backend logic.
+    // eslint-disable-next-line no-alert
+    alert("Invite flow will be connected here");
+  }
+
   return (
     <section className="rounded-3xl bg-white p-5 shadow-sm">
       <div className="mb-6">
@@ -29,109 +41,182 @@ export default function EmployeesSection({
           employee has no shifts.
         </p>
       </div>
-
       <section className="mb-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-        <h3 className="text-lg font-bold">Add Employee</h3>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <label className="mb-1 block text-sm font-medium">Name</label>
-            <input
-              value={newEmployeeForm.name}
-              onChange={(e) =>
-                setNewEmployeeForm((current: any) => ({
-                  ...current,
-                  name: e.target.value,
-                }))
-              }
-              placeholder="Employee name"
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-            />
+            <h3 className="text-lg font-bold">Team access & staffing</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Choose whether you are adding staff for scheduling or inviting them
+              to log in to Planyo.
+            </p>
           </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium">
-              Hourly Rate (DKK)
-            </label>
-            <input
-              type="number"
-              value={newEmployeeForm.hourlyRate}
-              onChange={(e) =>
-                setNewEmployeeForm((current: any) => ({
-                  ...current,
-                  hourlyRate: e.target.value,
-                }))
-              }
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-            />
+          <div className="inline-flex rounded-2xl bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => setEmployeeMode("add")}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold ${
+                employeeMode === "add"
+                  ? "bg-slate-900 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              Add employee
+            </button>
+            <button
+              type="button"
+              onClick={() => setEmployeeMode("invite")}
+              className={`ml-1 rounded-2xl px-4 py-2 text-sm font-semibold ${
+                employeeMode === "invite"
+                  ? "bg-slate-900 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              Invite employee
+            </button>
           </div>
+        </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium">
-              Default Role
-            </label>
-            <div className="space-y-2">
-              <select
-                value={
-                  newEmployeeRoleMode === "custom"
-                    ? CUSTOM_ROLE_OPTION
-                    : newEmployeeForm.defaultRole
-                }
-                onChange={(e) => {
-                  if (e.target.value === CUSTOM_ROLE_OPTION) {
-                    setNewEmployeeRoleMode("custom");
-                    setNewEmployeeForm((current: any) => ({
-                      ...current,
-                      defaultRole:
-                        current.defaultRole &&
-                        !roleSuggestions.includes(current.defaultRole)
-                          ? current.defaultRole
-                          : "",
-                    }));
-                    return;
-                  }
-
-                  setNewEmployeeRoleMode("preset");
-                  setNewEmployeeForm((current: any) => ({
-                    ...current,
-                    defaultRole: e.target.value,
-                  }));
-                }}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-              >
-                {roleSuggestions.map((role: string) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-                <option value={CUSTOM_ROLE_OPTION}>Custom role…</option>
-              </select>
-
-              {newEmployeeRoleMode === "custom" ? (
+        {employeeMode === "add" && (
+          <>
+            <p className="mt-4 text-sm text-slate-500">
+              Use this to add staff for scheduling (no login required).
+            </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Name</label>
                 <input
-                  value={newEmployeeForm.defaultRole}
+                  value={newEmployeeForm.name}
                   onChange={(e) =>
                     setNewEmployeeForm((current: any) => ({
                       ...current,
-                      defaultRole: e.target.value,
+                      name: e.target.value,
                     }))
                   }
-                  placeholder="Write default role"
+                  placeholder="Employee name"
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
                 />
-              ) : null}
-            </div>
-          </div>
-        </div>
+              </div>
 
-        <div className="mt-4">
-          <button
-            onClick={addEmployee}
-            className="rounded-2xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800"
-          >
-            Add Employee
-          </button>
-        </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Hourly Rate (DKK)
+                </label>
+                <input
+                  type="number"
+                  value={newEmployeeForm.hourlyRate}
+                  onChange={(e) =>
+                    setNewEmployeeForm((current: any) => ({
+                      ...current,
+                      hourlyRate: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Default Role
+                </label>
+                <div className="space-y-2">
+                  <select
+                    value={
+                      newEmployeeRoleMode === "custom"
+                        ? CUSTOM_ROLE_OPTION
+                        : newEmployeeForm.defaultRole
+                    }
+                    onChange={(e) => {
+                      if (e.target.value === CUSTOM_ROLE_OPTION) {
+                        setNewEmployeeRoleMode("custom");
+                        setNewEmployeeForm((current: any) => ({
+                          ...current,
+                          defaultRole:
+                            current.defaultRole &&
+                            !roleSuggestions.includes(current.defaultRole)
+                              ? current.defaultRole
+                              : "",
+                        }));
+                        return;
+                      }
+
+                      setNewEmployeeRoleMode("preset");
+                      setNewEmployeeForm((current: any) => ({
+                        ...current,
+                        defaultRole: e.target.value,
+                      }));
+                    }}
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                  >
+                    {roleSuggestions.map((role: string) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_ROLE_OPTION}>Custom role…</option>
+                  </select>
+
+                  {newEmployeeRoleMode === "custom" ? (
+                    <input
+                      value={newEmployeeForm.defaultRole}
+                      onChange={(e) =>
+                        setNewEmployeeForm((current: any) => ({
+                          ...current,
+                          defaultRole: e.target.value,
+                        }))
+                      }
+                      placeholder="Write default role"
+                      className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                    />
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <button
+                onClick={addEmployee}
+                className="rounded-2xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800"
+              >
+                Add Employee
+              </button>
+            </div>
+          </>
+        )}
+
+        {employeeMode === "invite" && (
+          <form onSubmit={handleInviteSubmit} className="mt-4 space-y-4">
+            <p className="text-sm text-slate-500">
+              Invite a team member to access Planyo.
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Email</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="teammember@example.com"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Role</label>
+                <select
+                  defaultValue="employee"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                >
+                  <option value="employee">employee</option>
+                  <option value="admin">admin</option>
+                </select>
+              </div>
+            </div>
+            <button
+              type="submit"
+              className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              Send invite
+            </button>
+          </form>
+        )}
       </section>
 
       <div className="grid gap-4">
