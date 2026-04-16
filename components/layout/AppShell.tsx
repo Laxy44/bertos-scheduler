@@ -1242,23 +1242,25 @@ async function handleLogout() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("employees")
-      .insert({
-        company_id: activeCompanyId,
+    const response = await fetch("/api/employees", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        companyId: activeCompanyId,
         name: trimmedName,
-        hourly_rate: hourlyRate,
-        default_role: trimmedRole,
-        unavailable_dates: [],
-        active: true,
-      })
-      .select()
-      .single();
+        hourlyRate,
+        defaultRole: trimmedRole,
+      }),
+    });
 
-    if (error) {
-      alert(error.message);
+    const result = await response.json();
+    if (!response.ok || !result?.employee) {
+      alert(result?.error || "Could not add employee.");
       return;
     }
+    const data = result.employee;
 
     const newEmployee: any = {
       id: data.id,
