@@ -101,6 +101,11 @@ function CallbackClientInner() {
 
       const sp = new URLSearchParams();
       search.forEach((value, key) => sp.set(key, value));
+      // Hash fragment params are client-only; carry them into callback destination logic.
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      hashParams.forEach((value, key) => {
+        if (!sp.has(key)) sp.set(key, value);
+      });
 
       const destination = await resolveAuthCallbackDestination(supabase, sp, user);
       router.replace(destination);
