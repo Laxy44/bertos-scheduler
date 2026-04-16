@@ -87,7 +87,7 @@ async function acceptInviteForUser(
       .update({ status: "accepted" })
       .eq("id", invite.id)
       .eq("status", "pending");
-    redirect("/");
+    redirect("/account-ready");
   }
 
   const insertMembership = await supabase.from("company_members").insert({
@@ -120,7 +120,7 @@ async function acceptInviteForUser(
     });
   });
 
-  redirect("/");
+  redirect("/account-ready");
 }
 
 async function getAuthenticatedUserWithSingleRetry(supabase: SupabaseClient) {

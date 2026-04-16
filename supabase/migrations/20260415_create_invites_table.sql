@@ -3,7 +3,7 @@ create table if not exists public.invites (
   email text not null,
   company_id uuid not null references public.companies(id) on delete cascade,
   role text not null default 'employee',
-  status text not null default 'invited' check (status in ('invited', 'pending_verification', 'active')),
+  status text not null default 'pending' check (status in ('pending', 'accepted')),
   created_at timestamptz not null default now()
 );
 
