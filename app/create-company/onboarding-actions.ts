@@ -19,6 +19,59 @@ type TeamEmployee = {
   role: string;
 };
 
+function isMissingProfileColumnError(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("column") &&
+    normalized.includes("profiles") &&
+    normalized.includes("schema cache")
+  );
+}
+
+function isMissingProfilesTableError(message: string) {
+  const normalized = message.toLowerCase();
+  return normalized.includes('relation "profiles" does not exist');
+}
+
+async function upsertOwnerProfileSafely(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  params: { ownerId: string; profileName: string }
+) {
+  const byName = await admin.from("profiles").upsert(
+    {
+      id: params.ownerId,
+      name: params.profileName,
+    },
+    { onConflict: "id" }
+  );
+  if (!byName.error) return null;
+
+  if (isMissingProfilesTableError(byName.error.message)) {
+    return null;
+  }
+  if (!isMissingProfileColumnError(byName.error.message)) {
+    return byName.error.message;
+  }
+
+  const byFullName = await admin.from("profiles").upsert(
+    {
+      id: params.ownerId,
+      full_name: params.profileName,
+    },
+    { onConflict: "id" }
+  );
+  if (!byFullName.error) return null;
+
+  if (
+    isMissingProfilesTableError(byFullName.error.message) ||
+    isMissingProfileColumnError(byFullName.error.message)
+  ) {
+    // Some projects keep profiles minimal or without a display-name field.
+    return null;
+  }
+  return byFullName.error.message;
+}
+
 function readRequired(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
@@ -135,17 +188,13 @@ export async function finishOwnerOnboarding(
     };
   }
 
-  const profileName = `${firstName} ${lastName}`.trim();
-  const profileUpsert = await admin.from("profiles").upsert(
-    {
-      id: ownerId,
-      name: profileName || ownerEmail || "Owner",
-    },
-    { onConflict: "id" }
-  );
-
-  if (profileUpsert.error) {
-    return { error: profileUpsert.error.message };
+  const profileName = `${firstName} ${lastName}`.trim() || ownerEmail || "Owner";
+  const profileError = await upsertOwnerProfileSafely(admin, {
+    ownerId,
+    profileName,
+  });
+  if (profileError) {
+    return { error: profileError };
   }
 
   const employeeRows = employees
