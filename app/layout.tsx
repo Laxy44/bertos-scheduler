@@ -15,8 +15,11 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bertos Scheduler",
-  description: "Staff scheduling, payroll overview, and timesheet management for Bertos Gastronomia ApS.",
+  title: {
+    default: "Planyo",
+    template: "%s | Planyo",
+  },
+  description: "Staff scheduling platform",
 };
 
 export default function RootLayout({
