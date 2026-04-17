@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getSiteUrlFromRequest } from "@/lib/site-url";
 import {
   createPendingInviteAndSendEmail,
   type AppInviteRole,
@@ -47,9 +48,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Employee email is required" }, { status: 400 });
   }
 
+  const origin = getSiteUrlFromRequest(request);
+
   const result = await createPendingInviteAndSendEmail(supabase, user.id, {
     email,
     role,
+    origin,
   });
 
   if (!result.ok) {

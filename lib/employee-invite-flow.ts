@@ -20,11 +20,11 @@ export type CreatePendingInviteResult =
 export async function createPendingInviteAndSendEmail(
   supabase: SupabaseClient,
   userId: string,
-  params: { email: string; role: AppInviteRole }
+  params: { email: string; role: AppInviteRole; origin?: string }
 ): Promise<CreatePendingInviteResult> {
   const email = params.email.trim().toLowerCase();
   const role = params.role;
-  const origin = getSiteUrl();
+  const origin = (params.origin || getSiteUrl()).replace(/\/$/, "");
 
   if (!email) {
     return { ok: false, error: "Employee email is required" };
@@ -77,7 +77,7 @@ export async function createPendingInviteAndSendEmail(
     return { ok: false, error: inviteInsert.error.message };
   }
 
-  const inviteEmail = await sendEmployeeInviteEmail(supabase, email, origin);
+  const inviteEmail = await sendEmployeeInviteEmail(email, origin);
 
   if (inviteEmail.error) {
     return {

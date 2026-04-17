@@ -93,6 +93,7 @@ export default function EmployeesSection({
         const inviteEmail = modalForm.email.trim().toLowerCase();
         const inviteRes = await fetch("/api/invites", {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: inviteEmail,
@@ -105,7 +106,8 @@ export default function EmployeesSection({
         if (!inviteRes.ok) {
           inviteNote = ` Invite email was not sent: ${inviteJson.error || inviteRes.statusText}.`;
         } else {
-          inviteNote = " Invite email sent.";
+          inviteNote =
+            " Invite email sent (if nothing arrives in a few minutes, check spam and Supabase Auth → email / SMTP).";
         }
       }
 

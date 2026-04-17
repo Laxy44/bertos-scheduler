@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
-import { getSiteUrl } from "../../lib/site-url";
+import { getSiteUrlFromHeaders } from "../../lib/site-url-server";
 import { sendEmployeeInviteEmail } from "../../lib/invite-email";
 import {
   createPendingInviteAndSendEmail,
@@ -36,9 +36,12 @@ export async function createInvite(formData: FormData) {
     redirect("/login?message=Please log in to create invites");
   }
 
+  const origin = await getSiteUrlFromHeaders();
+
   const result = await createPendingInviteAndSendEmail(supabase, user.id, {
     email,
     role,
+    origin,
   });
 
   if (!result.ok) {
@@ -112,7 +115,7 @@ export async function resendInvite(formData: FormData) {
   const supabase = await createServerSupabaseClient();
   const inviteId = String(formData.get("inviteId") || "").trim();
   const inviteEmail = String(formData.get("inviteEmail") || "").trim().toLowerCase();
-  const origin = getSiteUrl();
+  const origin = await getSiteUrlFromHeaders();
 
   if (!inviteId || !inviteEmail) {
     redirect("/invites?message=Invite id and email are required");
@@ -163,7 +166,7 @@ export async function resendInvite(formData: FormData) {
     redirect("/invites?message=Pending invite not found");
   }
 
-  const resend = await sendEmployeeInviteEmail(supabase, inviteEmail, origin);
+  const resend = await sendEmployeeInviteEmail(inviteEmail, origin);
 
   if (resend.error) {
     redirect(`/invites?message=Resend failed: ${encodeURIComponent(resend.error.message)}`);
