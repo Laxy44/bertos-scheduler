@@ -240,8 +240,10 @@ export async function finishOwnerOnboarding(
   }
 
   if (isExistingAccount) {
-    redirect("/create-company/success?mode=existing");
+    redirect(
+      `/create-company/success?mode=existing&email=${encodeURIComponent(ownerEmail)}`
+    );
   }
 
-  redirect("/create-company/success?mode=new");
+  redirect(`/create-company/success?mode=new&email=${encodeURIComponent(ownerEmail)}`);
 }

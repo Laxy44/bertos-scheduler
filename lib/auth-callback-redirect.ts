@@ -60,7 +60,7 @@ export async function resolveAuthCallbackDestination(
   }
 
   if (flow === "signup" || typeParam === "signup") {
-    return "/create-company";
+    return "/login?confirmed=1";
   }
 
   if (flow === "account-ready") {

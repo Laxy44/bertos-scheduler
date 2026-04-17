@@ -15,6 +15,7 @@ export function LoginForm({
   const search = useSearchParams();
   const message = search.get("message") || undefined;
   const mode = search.get("mode") ?? undefined;
+  const confirmed = search.get("confirmed") === "1";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
@@ -27,6 +28,12 @@ export function LoginForm({
             ? "Enter your email and we’ll send you a password reset link"
             : "Sign in to access Planyo"}
         </p>
+
+        {confirmed ? (
+          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 ring-1 ring-emerald-200">
+            Email confirmed. You can now log in to enter your workspace.
+          </div>
+        ) : null}
 
         {message ? (
           <div

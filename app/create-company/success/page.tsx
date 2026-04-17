@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { resendOwnerConfirmation } from "./actions";
 
 type SuccessPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -14,22 +15,46 @@ export default async function CreateCompanySuccessPage({
 }: SuccessPageProps) {
   const params = await searchParams;
   const mode = readParam(params.mode);
+  const ownerEmail = readParam(params.email)?.trim().toLowerCase() || "";
+  const message = readParam(params.message);
   const isExisting = mode === "existing";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-slate-900">Workspace is ready</h1>
+        <h1 className="text-2xl font-bold text-slate-900">
+          {isExisting
+            ? "Workspace is ready"
+            : "Check your email to activate your workspace"}
+        </h1>
         {isExisting ? (
           <p className="mt-2 text-sm text-slate-600">
             Your company setup is complete. Continue to your workspace.
           </p>
         ) : (
           <p className="mt-2 text-sm text-slate-600">
-            Your account and workspace were created. Check your email to confirm your account,
-            then log in to enter Planyo.
+            We sent a confirmation email to activate your owner account. After confirming, return
+            to login to enter Planyo.
           </p>
         )}
+
+        {!isExisting && ownerEmail ? (
+          <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200">
+            Confirmation email: <span className="font-semibold">{ownerEmail}</span>
+          </p>
+        ) : null}
+
+        {message ? (
+          <div
+            className={`mt-3 rounded-2xl px-4 py-3 text-sm ring-1 ${
+              message.toLowerCase().includes("sent")
+                ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                : "bg-amber-50 text-amber-700 ring-amber-200"
+            }`}
+          >
+            {message}
+          </div>
+        ) : null}
 
         <div className="mt-6 space-y-3">
           {isExisting ? (
@@ -40,12 +65,35 @@ export default async function CreateCompanySuccessPage({
               Go to workspace
             </Link>
           ) : (
-            <Link
-              href="/login"
-              className="block w-full rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
-            >
-              Go to login
-            </Link>
+            <>
+              <a
+                href="https://mail.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Open Gmail
+              </a>
+
+              <Link
+                href="/login"
+                className="block w-full rounded-2xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Back to login
+              </Link>
+
+              <form action={resendOwnerConfirmation}>
+                <input type="hidden" name="email" value={ownerEmail} />
+                <input type="hidden" name="mode" value={mode || "new"} />
+                <button
+                  type="submit"
+                  disabled={!ownerEmail}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Resend email
+                </button>
+              </form>
+            </>
           )}
         </div>
       </div>
