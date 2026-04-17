@@ -1884,6 +1884,16 @@ async function handleLogout() {
     }, 500);
   }
 
+  function openCreateShiftFromHeader() {
+    setActiveTab("schedule");
+    resetForm();
+    setShowShiftForm(true);
+  }
+
+  function openAddEmployeeFromHeader() {
+    setActiveTab("employees");
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <datalist id="role-suggestions">
@@ -1899,10 +1909,11 @@ async function handleLogout() {
                 Planyo • Workspace Dashboard
               </p>
               <h1 className="mt-2 text-3xl font-bold md:text-4xl">
-                {workspaceName}
+                {isAdmin ? "Let’s plan your week" : "Welcome back 👋"}
               </h1>
               <p className="mt-2 text-slate-400">
-                Staff Scheduler{workspaceCvr ? ` • CVR: ${workspaceCvr}` : ""}
+                {workspaceName}
+                {workspaceCvr ? ` • CVR: ${workspaceCvr}` : ""}
               </p>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -1916,19 +1927,35 @@ async function handleLogout() {
                 ) : null}
               </div>
 
-              <div className="mt-3">
+              <div className="mt-4 flex flex-wrap gap-2">
+                {isAdmin ? (
+                  <button
+                    onClick={openCreateShiftFromHeader}
+                    className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                  >
+                    + Create Shift
+                  </button>
+                ) : null}
+                {isAdmin ? (
+                  <button
+                    onClick={openAddEmployeeFromHeader}
+                    className="rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20"
+                  >
+                    + Add Employee
+                  </button>
+                ) : null}
                 {normalizedRole === "owner" ? (
                   <Link
                     href="/invites"
-                    className="mr-2 inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                    className="inline-block rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20"
                   >
-                    Invite employees
+                    Invite Team
                   </Link>
                 ) : null}
                 <button
-    onClick={handleLogout}
-    className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-             >
+                  onClick={handleLogout}
+                  className="rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20"
+                >
                 Logout
               </button>
             </div>
@@ -1941,39 +1968,55 @@ async function handleLogout() {
               {isAdmin ? (
                 <>
                   <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-sm text-slate-300">Total Shifts</p>
-                    <p className="mt-1 text-2xl font-bold">{shifts.length}</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
+                      Total Shifts
+                    </p>
+                    <p className="mt-1 text-3xl font-bold leading-none">{shifts.length}</p>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-sm text-slate-300">{selectedDayName} Planned</p>
-                    <p className="mt-1 text-2xl font-bold">{dayHours.toFixed(1)}</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
+                      {selectedDayName} Planned
+                    </p>
+                    <p className="mt-1 text-3xl font-bold leading-none">{dayHours.toFixed(1)}</p>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-sm text-slate-300">{selectedDayName} Actual</p>
-                    <p className="mt-1 text-2xl font-bold">{dayWorkedHours.toFixed(1)}</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
+                      {selectedDayName} Actual
+                    </p>
+                    <p className="mt-1 text-3xl font-bold leading-none">{dayWorkedHours.toFixed(1)}</p>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-sm text-slate-300">Active Employees</p>
-                    <p className="mt-1 text-2xl font-bold">{activeEmployees.length}</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
+                      Active Employees
+                    </p>
+                    <p className="mt-1 text-3xl font-bold leading-none">{activeEmployees.length}</p>
                   </div>
                 </>
               ) : (
                 <>
                   <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-sm text-slate-300">My Shifts</p>
-                    <p className="mt-1 text-2xl font-bold">{myStats.shifts}</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
+                      My Shifts
+                    </p>
+                    <p className="mt-1 text-3xl font-bold leading-none">{myStats.shifts}</p>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-sm text-slate-300">Planned Hours</p>
-                    <p className="mt-1 text-2xl font-bold">{myStats.planned.toFixed(1)}</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
+                      Planned Hours
+                    </p>
+                    <p className="mt-1 text-3xl font-bold leading-none">{myStats.planned.toFixed(1)}</p>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-sm text-slate-300">Approved Hours</p>
-                    <p className="mt-1 text-2xl font-bold">{myStats.approved.toFixed(1)}</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
+                      Approved Hours
+                    </p>
+                    <p className="mt-1 text-3xl font-bold leading-none">{myStats.approved.toFixed(1)}</p>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-sm text-slate-300">Worked Hours</p>
-                    <p className="mt-1 text-2xl font-bold">{myStats.worked.toFixed(1)}</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
+                      Worked Hours
+                    </p>
+                    <p className="mt-1 text-3xl font-bold leading-none">{myStats.worked.toFixed(1)}</p>
                   </div>
                 </>
               )}
@@ -2149,6 +2192,8 @@ async function handleLogout() {
     getWorkedHours={getWorkedHours}
     isAdmin={isAdmin}
     employeeName={employeeName}
+    onCreateShiftCta={openCreateShiftFromHeader}
+    onAddEmployeeCta={openAddEmployeeFromHeader}
   />
 )}
             

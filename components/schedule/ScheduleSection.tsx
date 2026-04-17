@@ -108,6 +108,8 @@ export default function ScheduleSection({
   getWorkedHours,
   isAdmin,
   employeeName,
+  onCreateShiftCta,
+  onAddEmployeeCta,
 }: any) {
   const scheduleGridEmployees =
     employeeFilter === "All"
@@ -236,8 +238,31 @@ export default function ScheduleSection({
             </div>
 
             {scheduleGridEmployees.length === 0 ? (
-              <div className="p-10 text-center text-sm text-slate-500">
-                No scheduled employees found for the current filter.
+              <div className="p-8">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                  <p className="text-lg font-semibold text-slate-900">No shifts yet</p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Start by adding employees or creating your first shift.
+                  </p>
+                  {isAdmin ? (
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={onCreateShiftCta}
+                        className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                      >
+                        + Create Shift
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onAddEmployeeCta}
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                      >
+                        + Add Employee
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             ) : (
               scheduleGridEmployees.map((employeeName: string) => {
@@ -368,8 +393,29 @@ export default function ScheduleSection({
 
       <div className="space-y-3">
         {filteredShifts.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500">
-            No shifts for {selectedDayName} ({selectedDate}).
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-600">
+            <p className="text-base font-semibold text-slate-900">No shifts yet</p>
+            <p className="mt-2 text-sm">
+              Start by adding employees or creating your first shift.
+            </p>
+            {isAdmin ? (
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={onCreateShiftCta}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  + Create Shift
+                </button>
+                <button
+                  type="button"
+                  onClick={onAddEmployeeCta}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  + Add Employee
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : (
           filteredShifts
