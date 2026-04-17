@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "../lib/supabase-server";
 import AppShell from "../components/layout/AppShell";
+import { maybeSendWelcomeEmailForUser } from "../lib/welcome-email-trigger";
 
 type ProfileRow = {
   role?: string | null;
@@ -34,6 +35,9 @@ export default async function Page() {
   if (userError || !user) {
     redirect("/login");
   }
+
+  // First authenticated load hook: sends welcome email once after confirmed email.
+  await maybeSendWelcomeEmailForUser(user);
 
   let profile: ProfileRow | null = null;
   let membership: CompanyMemberRow | null = null;
