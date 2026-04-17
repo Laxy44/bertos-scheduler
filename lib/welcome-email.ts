@@ -38,8 +38,7 @@ export async function sendWelcomeEmail({ to, firstName }: SendWelcomeEmailParams
   const safeFirstName = (firstName || "there").trim() || "there";
 
   if (!resendApiKey) {
-    console.warn("[welcome-email] RESEND_API_KEY is missing; skipping email send.");
-    return;
+    throw new Error("RESEND_API_KEY is missing");
   }
 
   const response = await fetch("https://api.resend.com/emails", {

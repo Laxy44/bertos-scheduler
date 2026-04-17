@@ -42,10 +42,42 @@ export async function maybeSendWelcomeEmailForUser(user: User): Promise<void> {
     return;
   }
 
-  const profile = profileQuery.data;
+  let profile = profileQuery.data;
   if (!profile?.id) {
-    // Keep this V1 safe: if profile row is missing, skip and do not block user flow.
-    return;
+    // Some environments do not create profiles eagerly. Create a minimal row so
+    // welcome-email delivery can still be tracked with the sent flag.
+    const createProfile = await admin.from("profiles").upsert(
+      {
+        id: user.id,
+        welcome_email_sent: false,
+      },
+      { onConflict: "id" }
+    );
+
+    if (createProfile.error) {
+      console.warn("[welcome-email] profile bootstrap failed", {
+        userId: user.id,
+        error: createProfile.error.message,
+      });
+      return;
+    }
+
+    const profileReload = await admin
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .limit(1)
+      .maybeSingle<ProfileRecord>();
+
+    if (profileReload.error || !profileReload.data?.id) {
+      console.warn("[welcome-email] profile reload failed after bootstrap", {
+        userId: user.id,
+        error: profileReload.error?.message || "Profile row not found",
+      });
+      return;
+    }
+
+    profile = profileReload.data;
   }
 
   if (profile.welcome_email_sent) {
