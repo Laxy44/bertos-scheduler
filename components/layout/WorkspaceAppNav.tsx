@@ -148,13 +148,15 @@ export default function WorkspaceAppNav({
             <button type="button" className={menuItem} onClick={() => openHomeMenuTab("home")}>
               Home
             </button>
-            <button
-              type="button"
-              className={menuItem}
-              onClick={() => openHomeMenuTab("schedule")}
-            >
-              {isAdmin ? "Schedule" : "Your schedule"}
-            </button>
+            {isAdmin ? (
+              <button type="button" className={menuItem} onClick={() => openHomeMenuTab("schedule")}>
+                Schedule
+              </button>
+            ) : (
+              <button type="button" className={menuItem} onClick={() => openHomeMenuRoute("/your-schedule")}>
+                Your schedule
+              </button>
+            )}
             <button
               type="button"
               className={menuItem}
