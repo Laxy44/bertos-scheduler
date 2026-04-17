@@ -49,19 +49,6 @@ export default async function CreateCompanyPage({
           existingUserEmail={userEmail}
         />
 
-        <div className="mt-4 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-          <p className="text-sm font-medium text-slate-700">Invited employees</p>
-          <p className="mt-1 text-sm text-slate-600">
-            Already invited by a company owner? Use join with invite.
-          </p>
-          <Link
-            href="/complete-account"
-            className="mt-3 block rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100"
-          >
-            Join with invite
-          </Link>
-        </div>
-
         <Link
           href="/login"
           className="mt-4 block text-center text-sm font-medium text-slate-600 hover:text-slate-900"

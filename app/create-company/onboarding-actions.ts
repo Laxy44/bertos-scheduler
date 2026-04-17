@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createCompanyForUser } from "../../lib/auth";
 import { buildSignupEmailRedirectUrl } from "../../lib/auth-callback-urls";
 import { createPendingInviteAndSendEmail } from "../../lib/employee-invite-flow";
+import { createSupabaseAdminClient } from "../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 import { getSiteUrlFromHeaders } from "../../lib/site-url-server";
 
@@ -17,8 +18,6 @@ type TeamEmployee = {
   email: string;
   role: string;
 };
-
-const EMPTY_STATE: ActionState = { error: null };
 
 function readRequired(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -57,9 +56,10 @@ export async function finishOwnerOnboarding(
   const password = String(formData.get("password") || "");
 
   const companyName = readRequired(formData, "company_name");
+  const skipTeam = String(formData.get("skip_team") || "") === "true";
   const sendInvites = String(formData.get("send_invites") || "") === "true";
   const employeesJson = String(formData.get("employees_json") || "[]");
-  const employees = parseEmployees(employeesJson);
+  const employees = skipTeam ? [] : parseEmployees(employeesJson);
   const origin = await getSiteUrlFromHeaders();
 
   if (!firstName || !lastName) {
@@ -73,6 +73,7 @@ export async function finishOwnerOnboarding(
     data: { user: existingUser },
   } = await supabase.auth.getUser();
 
+  const isExistingAccount = Boolean(existingUser);
   let ownerId = existingUser?.id || "";
   let ownerEmail = (existingUser?.email || "").trim().toLowerCase();
 
@@ -104,37 +105,30 @@ export async function finishOwnerOnboarding(
       };
     }
 
-    const signInResult = await supabase.auth.signInWithPassword({
-      email: submittedEmail,
-      password,
-    });
-
-    if (signInResult.error) {
-      return {
-        error: "Account created. Confirm email, then log in to finish company setup.",
-      };
-    }
-
-    const {
-      data: { user: ownerUser },
-      error: ownerUserError,
-    } = await supabase.auth.getUser();
-
-    if (ownerUserError || !ownerUser) {
+    const ownerUser = signUpResult.data.user;
+    if (!ownerUser?.id) {
       return { error: "Unable to resolve owner account." };
     }
 
     ownerId = ownerUser.id;
-    ownerEmail = (ownerUser.email || "").trim().toLowerCase();
+    ownerEmail = (ownerUser.email || submittedEmail).trim().toLowerCase();
   }
 
   if (!ownerId) {
     return { error: "Unable to resolve owner account." };
   }
 
+  let admin;
+  try {
+    admin = createSupabaseAdminClient();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { error: message };
+  }
+
   let companyId = "";
   try {
-    companyId = await createCompanyForUser(supabase, { id: ownerId }, companyName);
+    companyId = await createCompanyForUser(admin, { id: ownerId }, companyName);
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to create company.",
@@ -142,7 +136,7 @@ export async function finishOwnerOnboarding(
   }
 
   const profileName = `${firstName} ${lastName}`.trim();
-  const profileUpsert = await supabase.from("profiles").upsert(
+  const profileUpsert = await admin.from("profiles").upsert(
     {
       id: ownerId,
       name: profileName || ownerEmail || "Owner",
@@ -163,7 +157,7 @@ export async function finishOwnerOnboarding(
     .filter((employee) => employee.name);
 
   if (employeeRows.length > 0) {
-    const insertEmployees = await supabase.from("employees").insert(
+    const insertEmployees = await admin.from("employees").insert(
       employeeRows.map((employee) => ({
         company_id: companyId,
         name: employee.name,
@@ -182,7 +176,7 @@ export async function finishOwnerOnboarding(
   if (sendInvites) {
     for (const employee of employeeRows) {
       if (!employee.email) continue;
-      const inviteResult = await createPendingInviteAndSendEmail(supabase, ownerId, {
+      const inviteResult = await createPendingInviteAndSendEmail(admin, ownerId, {
         email: employee.email,
         role: "employee",
         origin,
@@ -196,6 +190,9 @@ export async function finishOwnerOnboarding(
     }
   }
 
-  redirect("/");
-  return EMPTY_STATE;
+  if (isExistingAccount) {
+    redirect("/create-company/success?mode=existing");
+  }
+
+  redirect("/create-company/success?mode=new");
 }

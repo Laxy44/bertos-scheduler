@@ -123,6 +123,13 @@ export default function OwnerOnboardingWizard({
     setStep((current) => Math.max(current - 1, 0));
   }
 
+  function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {
+    if (step < STEPS.length - 1) {
+      event.preventDefault();
+      goNext();
+    }
+  }
+
   function addRole() {
     const role = team.customRole.trim();
     if (!role) return;
@@ -177,7 +184,12 @@ export default function OwnerOnboardingWizard({
   const activeError = localError || state.error;
 
   return (
-    <form action={formAction} className="mt-6 space-y-5" autoComplete="off">
+    <form
+      action={formAction}
+      onSubmit={handleFormSubmit}
+      className="mt-6 space-y-5"
+      autoComplete="off"
+    >
       {/* Autofill trap to reduce browser injecting remembered login credentials into step fields. */}
       <input
         type="text"
@@ -265,7 +277,7 @@ export default function OwnerOnboardingWizard({
       <input type="hidden" name="employees_json" value={serializedEmployees} />
       <input type="hidden" name="send_invites" value={team.sendInvites ? "true" : "false"} />
 
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-between gap-2 pt-2">
         <button
           type="button"
           onClick={goBack}
@@ -284,18 +296,29 @@ export default function OwnerOnboardingWizard({
             Continue
           </button>
         ) : (
-          <button
-            type="submit"
-            onClick={(e) => {
-              if (!validateCurrentStep()) {
-                e.preventDefault();
-              }
-            }}
-            disabled={pending}
-            className="rounded-2xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-          >
-            {pending ? "Finishing..." : "Finish setup"}
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="submit"
+              name="skip_team"
+              value="true"
+              disabled={pending}
+              className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              Skip for now
+            </button>
+            <button
+              type="submit"
+              onClick={(e) => {
+                if (!validateCurrentStep()) {
+                  e.preventDefault();
+                }
+              }}
+              disabled={pending}
+              className="rounded-2xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+            >
+              {pending ? "Finishing..." : "Finish setup"}
+            </button>
+          </div>
         )}
       </div>
     </form>
