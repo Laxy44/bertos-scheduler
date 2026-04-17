@@ -285,6 +285,17 @@ export default function SchedulePage(props: any) {
     [safeSetWeekStart, setSelectedDate, setForm, setOpenMenuId]
   );
 
+  function handleEmptyMonthDayQuickAdd(date: string) {
+    if (isReadOnly) return;
+    const name = scheduleGridEmployees[0];
+    if (!name) {
+      onCreateShiftCta();
+      return;
+    }
+    const info = employees.find((e: any) => e.name === name);
+    openQuickAddForCell(name, date, info || {});
+  }
+
   const kpiCardClass = isReadOnly
     ? "flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200/90 bg-slate-50 px-4 py-3 shadow-sm"
     : "flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm";
@@ -326,9 +337,11 @@ export default function SchedulePage(props: any) {
         month={navigatorAnchor.getMonth() + 1}
         year={navigatorAnchor.getFullYear()}
         monthNames={monthNames}
-        onPickMonthCalendarDate={onPickMonthCalendarDate}
+        onMonthSelectDay={onPickMonthCalendarDate}
         columnDates={columnDates}
         isReadOnly={isReadOnly}
+        isAdmin={isAdmin}
+        employeeRateByName={employeeRateByName}
         shifts={gridShifts}
         employees={employees}
         scheduleGridEmployees={scheduleGridEmployees}
@@ -343,6 +356,7 @@ export default function SchedulePage(props: any) {
         onAddEmployeeCta={onAddEmployeeCta}
         openQuickAddForCell={openQuickAddForCell}
         openShiftFromGrid={openShiftFromGrid}
+        onEmptyMonthDayQuickAdd={handleEmptyMonthDayQuickAdd}
       />
 
       <div className="w-full">

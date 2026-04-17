@@ -1,21 +1,28 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useMemo } from "react";
-import { days } from "../../../lib/constants";
+import { useCallback, useMemo, useState } from "react";
 import { getMonthCalendarDays } from "../../../lib/utils";
+import MonthCalendarGrid from "./month/MonthCalendarGrid";
+import MonthDayDetailsPanel from "./month/MonthDayDetailsPanel";
+import MonthHeaderRow from "./month/MonthHeaderRow";
+import type { MonthDayMeta, ShiftLike } from "./month/types";
 
-const MAX_SHIFTS_VISIBLE = 4;
-
-type MonthScheduleViewProps = {
+export type MonthScheduleViewProps = {
   month: number;
   year: number;
   monthNames: readonly string[];
-  shifts: any[];
+  shifts: ShiftLike[];
   selectedDate: string;
-  onPickDate: (date: string) => void;
+  /** Syncs selected day + month anchor + week shell (same as previous onPickDate). */
+  onMonthSelectDay: (date: string) => void;
   isReadOnly: boolean;
-  openShiftFromGrid: (shift: any) => void;
+  isAdmin: boolean;
+  employeeRateByName: Record<string, number>;
+  getPlannedHours: (s: ShiftLike) => number;
+  getWorkedHours: (s: ShiftLike) => number;
+  openShiftFromGrid: (shift: ShiftLike) => void;
+  onEmptyMonthDayQuickAdd: (date: string) => void;
 };
 
 export default function MonthScheduleView({
@@ -24,10 +31,17 @@ export default function MonthScheduleView({
   monthNames,
   shifts,
   selectedDate,
-  onPickDate,
+  onMonthSelectDay,
   isReadOnly,
+  isAdmin,
+  employeeRateByName,
+  getPlannedHours,
+  getWorkedHours,
   openShiftFromGrid,
+  onEmptyMonthDayQuickAdd,
 }: MonthScheduleViewProps) {
+  const [detailsDate, setDetailsDate] = useState<string | null>(null);
+
   const cells = useMemo(() => getMonthCalendarDays(month, year), [month, year]);
 
   const todayStr = useMemo(() => {
@@ -38,104 +52,125 @@ export default function MonthScheduleView({
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
-  const shiftsByDate = useMemo(() => {
-    const map = new Map<string, any[]>();
+  const { shiftsByDate, dayMetaByDate } = useMemo(() => {
+    const byDate = new Map<string, ShiftLike[]>();
+    const meta = new Map<string, MonthDayMeta>();
+
     for (const shift of shifts) {
-      const list = map.get(shift.date) || [];
+      const list = byDate.get(shift.date) || [];
       list.push(shift);
-      map.set(shift.date, list);
+      byDate.set(shift.date, list);
     }
-    for (const [, list] of map) {
+
+    for (const [date, list] of byDate) {
       list.sort((a, b) => a.start.localeCompare(b.start));
+      const plannedHours = list.reduce((s, sh) => s + getPlannedHours(sh), 0);
+      const plannedPayroll = list.reduce(
+        (s, sh) => s + getPlannedHours(sh) * (employeeRateByName[sh.employee] || 0),
+        0
+      );
+      meta.set(date, { shiftCount: list.length, plannedHours, plannedPayroll });
     }
-    return map;
-  }, [shifts]);
+
+    return { shiftsByDate: byDate, dayMetaByDate: meta };
+  }, [shifts, getPlannedHours, employeeRateByName]);
+
+  const handleActivateDay = useCallback(
+    (date: string) => {
+      onMonthSelectDay(date);
+      if (isAdmin && !isReadOnly) {
+        const list = shiftsByDate.get(date) || [];
+        if (list.length === 0) {
+          onEmptyMonthDayQuickAdd(date);
+          return;
+        }
+      }
+      setDetailsDate(date);
+    },
+    [isAdmin, isReadOnly, onMonthSelectDay, onEmptyMonthDayQuickAdd, shiftsByDate]
+  );
+
+  const handleOpenDayDetails = useCallback(
+    (date: string) => {
+      onMonthSelectDay(date);
+      setDetailsDate(date);
+    },
+    [onMonthSelectDay]
+  );
+
+  const handleShiftSelect = useCallback(
+    (shift: ShiftLike) => {
+      onMonthSelectDay(shift.date);
+      if (isReadOnly) {
+        setDetailsDate(shift.date);
+        return;
+      }
+      openShiftFromGrid(shift);
+      setDetailsDate(null);
+    },
+    [isReadOnly, onMonthSelectDay, openShiftFromGrid]
+  );
+
+  const detailsShifts = detailsDate ? shiftsByDate.get(detailsDate) || [] : [];
+  const detailsLabel = useMemo(() => {
+    if (!detailsDate) return "";
+    const [y, m, d] = detailsDate.split("-").map(Number);
+    if (!y || !m || !d) return detailsDate;
+    return new Date(y, m - 1, d).toLocaleDateString("en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }, [detailsDate]);
+
+  const handlePanelAddShift = useCallback(() => {
+    if (!detailsDate) return;
+    setDetailsDate(null);
+    onEmptyMonthDayQuickAdd(detailsDate);
+  }, [detailsDate, onEmptyMonthDayQuickAdd]);
+
+  const handlePanelEditShift = useCallback(
+    (shift: ShiftLike) => {
+      setDetailsDate(null);
+      openShiftFromGrid(shift);
+    },
+    [openShiftFromGrid]
+  );
 
   return (
     <div className="w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="min-w-[720px] p-3 sm:p-4">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-slate-100 pb-3">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Month</p>
-            <h2 className="text-lg font-semibold text-slate-900">
-              {monthNames[month]} {year}
-            </h2>
-          </div>
-        </div>
+        <MonthHeaderRow monthNames={monthNames} month={month} year={year} />
 
-        <div className="grid grid-cols-7 gap-px rounded-lg border border-slate-200 bg-slate-200 shadow-sm">
-          {days.map((d) => (
-            <div
-              key={d}
-              className="bg-slate-100 px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-slate-600 sm:px-3 sm:py-2.5 sm:text-[11px]"
-            >
-              {d.slice(0, 3)}
-            </div>
-          ))}
-
-          {cells.map((cell) => {
-            const dayShifts = shiftsByDate.get(cell.date) || [];
-            const visible = dayShifts.slice(0, MAX_SHIFTS_VISIBLE);
-            const overflow = dayShifts.length - visible.length;
-            const isToday = cell.date === todayStr;
-            const isSelected = selectedDate === cell.date;
-
-            return (
-              <div
-                key={cell.date}
-                role="presentation"
-                onClick={() => onPickDate(cell.date)}
-                className={`flex min-h-[108px] cursor-pointer flex-col items-stretch border-t border-transparent px-2 py-2 text-left align-top transition sm:min-h-[120px] sm:px-2.5 sm:py-2.5 ${
-                  cell.isCurrentMonth ? "bg-white" : "bg-slate-50/95"
-                } ${isToday ? "ring-2 ring-inset ring-indigo-400/90" : ""} ${
-                  isSelected ? "bg-indigo-50/90 ring-1 ring-inset ring-indigo-200" : "hover:bg-slate-50"
-                } ${!cell.isCurrentMonth ? "text-slate-500" : "text-slate-900"}`}
-              >
-                <span
-                  className={`text-sm font-bold tabular-nums ${
-                    isToday ? "text-indigo-700" : !cell.isCurrentMonth ? "text-slate-400" : "text-slate-900"
-                  }`}
-                >
-                  {cell.dayNumber}
-                </span>
-                <div className="mt-1 flex min-h-0 flex-1 flex-col gap-1">
-                  {visible.map((shift) =>
-                    isReadOnly ? (
-                      <div
-                        key={shift.id}
-                        className="truncate rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-slate-800 sm:text-[11px]"
-                      >
-                        <span className="font-semibold text-slate-700">{shift.start}</span>
-                        <span className="text-slate-400">–</span>
-                        <span className="font-semibold text-slate-700">{shift.end}</span>
-                        <span className="ml-1 text-slate-500">{shift.employee}</span>
-                      </div>
-                    ) : (
-                      <button
-                        key={shift.id}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openShiftFromGrid(shift);
-                        }}
-                        className="truncate rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-left text-[10px] font-medium leading-tight text-slate-800 transition hover:border-indigo-300 hover:bg-indigo-50/60 sm:text-[11px]"
-                      >
-                        <span className="font-semibold text-slate-700">{shift.start}</span>
-                        <span className="text-slate-400">–</span>
-                        <span className="font-semibold text-slate-700">{shift.end}</span>
-                        <span className="ml-1 text-slate-500">{shift.employee}</span>
-                      </button>
-                    )
-                  )}
-                  {overflow > 0 ? (
-                    <span className="text-[10px] font-semibold text-slate-500">+{overflow} more</span>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <MonthCalendarGrid
+          cells={cells}
+          shiftsByDate={shiftsByDate}
+          dayMetaByDate={dayMetaByDate}
+          todayStr={todayStr}
+          selectedDate={selectedDate}
+          isAdmin={isAdmin}
+          isReadOnly={isReadOnly}
+          onActivateDay={handleActivateDay}
+          onOpenDayDetails={handleOpenDayDetails}
+          onShiftSelect={handleShiftSelect}
+        />
       </div>
+
+      {detailsDate ? (
+        <MonthDayDetailsPanel
+          date={detailsDate}
+          dateLabel={detailsLabel}
+          shifts={detailsShifts}
+          isAdmin={isAdmin}
+          isReadOnly={isReadOnly}
+          onClose={() => setDetailsDate(null)}
+          onAddShift={handlePanelAddShift}
+          onEditShift={handlePanelEditShift}
+          getPlannedHours={getPlannedHours}
+          getWorkedHours={getWorkedHours}
+        />
+      ) : null}
     </div>
   );
 }

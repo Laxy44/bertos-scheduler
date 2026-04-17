@@ -1,7 +1,9 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import type { ComponentProps } from "react";
 import type { ScheduleViewKind } from "../../lib/schedule-view-utils";
+import ScheduleGrid from "./ScheduleGrid";
 import DayScheduleView from "./views/DayScheduleView";
 import MonthScheduleView from "./views/MonthScheduleView";
 import TwoWeekScheduleView from "./views/TwoWeekScheduleView";
@@ -10,6 +12,8 @@ import WeekScheduleView from "./views/WeekScheduleView";
 type PlannerProps = {
   columnDates: any[];
   isReadOnly: boolean;
+  isAdmin: boolean;
+  employeeRateByName: Record<string, number>;
   shifts: any[];
   employees: any[];
   scheduleGridEmployees: string[];
@@ -24,14 +28,20 @@ type PlannerProps = {
   onAddEmployeeCta: () => void;
   openQuickAddForCell: (employeeNameValue: string, date: string, employeeInfo: any) => void;
   openShiftFromGrid: (shift: any) => void;
+  onEmptyMonthDayQuickAdd: (date: string) => void;
 };
+
+function toScheduleGridProps(planner: PlannerProps): ComponentProps<typeof ScheduleGrid> {
+  const { isAdmin: _a, employeeRateByName: _e, onEmptyMonthDayQuickAdd: _o, ...rest } = planner;
+  return rest;
+}
 
 type ScheduleViewRouterProps = {
   view: ScheduleViewKind;
   month: number;
   year: number;
   monthNames: readonly string[];
-  onPickMonthCalendarDate: (date: string) => void;
+  onMonthSelectDay: (date: string) => void;
 } & PlannerProps;
 
 export default function ScheduleViewRouter({
@@ -39,9 +49,11 @@ export default function ScheduleViewRouter({
   month,
   year,
   monthNames,
-  onPickMonthCalendarDate,
+  onMonthSelectDay,
   ...planner
 }: ScheduleViewRouterProps) {
+  const gridProps = toScheduleGridProps(planner);
+
   if (view === "month") {
     return (
       <MonthScheduleView
@@ -50,20 +62,25 @@ export default function ScheduleViewRouter({
         monthNames={monthNames}
         shifts={planner.shifts}
         selectedDate={planner.selectedDate}
-        onPickDate={onPickMonthCalendarDate}
+        onMonthSelectDay={onMonthSelectDay}
         isReadOnly={planner.isReadOnly}
+        isAdmin={planner.isAdmin}
+        employeeRateByName={planner.employeeRateByName}
+        getPlannedHours={planner.getPlannedHours}
+        getWorkedHours={planner.getWorkedHours}
         openShiftFromGrid={planner.openShiftFromGrid}
+        onEmptyMonthDayQuickAdd={planner.onEmptyMonthDayQuickAdd}
       />
     );
   }
 
   if (view === "day") {
-    return <DayScheduleView {...planner} />;
+    return <DayScheduleView {...gridProps} />;
   }
 
   if (view === "two_weeks") {
-    return <TwoWeekScheduleView {...planner} />;
+    return <TwoWeekScheduleView {...gridProps} />;
   }
 
-  return <WeekScheduleView {...planner} />;
+  return <WeekScheduleView {...gridProps} />;
 }
