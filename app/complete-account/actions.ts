@@ -8,15 +8,13 @@ import { authDebug } from "../../lib/auth-debug";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 import { getActiveMembership } from "../../lib/auth";
 import { getSiteUrl } from "../../lib/site-url";
+import { getLatestInviteByEmail, linkEmployeeUserToAuthUser } from "../../lib/workspace-invite-admin";
+import {
+  isInviteRowExpired,
+  type WorkspaceInviteRow,
+} from "../../lib/workspace-invite-types";
 
 const ACCOUNT_PATH = "/complete-account";
-
-type InviteRow = {
-  id: string;
-  company_id: string;
-  role: string | null;
-  status: string;
-};
 
 function authErrorMessage(message: string) {
   const normalized = message.toLowerCase();
@@ -36,32 +34,50 @@ function isUserAlreadyRegisteredError(error: { message?: string | null; code?: s
   );
 }
 
-async function getPendingInvite(supabase: SupabaseClient, email: string) {
-  const inviteQuery = await supabase
-    .from("invites")
-    .select("id, company_id, role, status")
-    .eq("email", email)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<InviteRow>();
+async function assertWorkspaceInviteReadyForEmail(email: string): Promise<WorkspaceInviteRow> {
+  const normalized = email.trim().toLowerCase();
+  const invite = await getLatestInviteByEmail(normalized);
 
-  if (inviteQuery.error || !inviteQuery.data) {
-    redirect(`${ACCOUNT_PATH}?message=No active invite found for this email`);
+  if (!invite) {
+    redirect(
+      `${ACCOUNT_PATH}?message=${encodeURIComponent(
+        "No workspace invitation was found for this email. Ask your admin to send a new invite from Planyo."
+      )}`
+    );
   }
 
-  if (inviteQuery.data.status !== "pending") {
-    redirect(`${ACCOUNT_PATH}?message=Invite is no longer active`);
+  if (invite.status === "accepted") {
+    redirect(
+      `/login?message=${encodeURIComponent(
+        "You have already joined this workspace. Sign in with your email and password."
+      )}`
+    );
   }
 
-  return inviteQuery.data;
+  if (invite.status === "revoked" || invite.status === "expired") {
+    redirect(
+      `/invite-link-expired?email=${encodeURIComponent(normalized)}&reason=${encodeURIComponent(invite.status)}`
+    );
+  }
+
+  if (invite.status === "pending" && isInviteRowExpired(invite)) {
+    redirect(`/invite-link-expired?email=${encodeURIComponent(normalized)}&reason=window`);
+  }
+
+  if (invite.status !== "pending") {
+    redirect(
+      `${ACCOUNT_PATH}?message=${encodeURIComponent("This invitation can no longer be used.")}`
+    );
+  }
+
+  return invite;
 }
 
 async function acceptInviteForUser(
   supabase: SupabaseClient,
   userId: string,
   email: string,
-  invite: InviteRow
+  invite: WorkspaceInviteRow
 ) {
   const accountMembership = await getActiveMembership(supabase, userId);
   if (accountMembership && accountMembership !== invite.company_id) {
@@ -87,7 +103,12 @@ async function acceptInviteForUser(
       .update({ status: "accepted" })
       .eq("id", invite.id)
       .eq("status", "pending");
-    redirect("/account-ready");
+    await linkEmployeeUserToAuthUser({
+      companyId: invite.company_id,
+      userId,
+      email,
+    });
+    redirect("/");
   }
 
   const insertMembership = await supabase.from("company_members").insert({
@@ -120,7 +141,13 @@ async function acceptInviteForUser(
     });
   });
 
-  redirect("/account-ready");
+  await linkEmployeeUserToAuthUser({
+    companyId: invite.company_id,
+    userId,
+    email,
+  });
+
+  redirect("/");
 }
 
 async function getAuthenticatedUserWithSingleRetry(supabase: SupabaseClient) {
@@ -147,7 +174,7 @@ export async function continueCompleteAccount(formData: FormData) {
     redirect(`${ACCOUNT_PATH}?message=Email is required`);
   }
 
-  await getPendingInvite(supabase, email);
+  await assertWorkspaceInviteReadyForEmail(email);
   redirect(`${ACCOUNT_PATH}?email=${encodeURIComponent(email)}`);
 }
 
@@ -168,7 +195,7 @@ export async function loginOrSignupAndCompleteInvite(formData: FormData) {
     redirect(`${ACCOUNT_PATH}?email=${encodeURIComponent(email)}&message=Password must be at least 6 characters`);
   }
 
-  const invite = await getPendingInvite(supabase, email);
+  const invite = await assertWorkspaceInviteReadyForEmail(email);
 
   const {
     data: { user: currentUser },

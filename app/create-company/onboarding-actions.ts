@@ -205,11 +205,33 @@ export async function finishOwnerOnboarding(
     }))
     .filter((employee) => employee.name);
 
-  if (employeeRows.length > 0) {
+  const teamEmployeesWithoutOwner = employeeRows.filter(
+    (employee) => (employee.email || "").trim().toLowerCase() !== ownerEmail
+  );
+
+  const ownerEmployeeInsert = await admin.from("employees").insert({
+    company_id: companyId,
+    user_id: ownerId,
+    name: profileName,
+    email: ownerEmail || null,
+    phone: null,
+    hourly_rate: 130,
+    default_role: "Owner",
+    unavailable_dates: [],
+    active: true,
+  });
+
+  if (ownerEmployeeInsert.error) {
+    console.warn("[onboarding] owner employee row not created", ownerEmployeeInsert.error.message);
+  }
+
+  if (teamEmployeesWithoutOwner.length > 0) {
     const insertEmployees = await admin.from("employees").insert(
-      employeeRows.map((employee) => ({
+      teamEmployeesWithoutOwner.map((employee) => ({
         company_id: companyId,
         name: employee.name,
+        email: employee.email || null,
+        phone: null,
         hourly_rate: 130,
         default_role: employee.role,
         unavailable_dates: [],
@@ -223,7 +245,7 @@ export async function finishOwnerOnboarding(
   }
 
   if (sendInvites) {
-    for (const employee of employeeRows) {
+    for (const employee of teamEmployeesWithoutOwner) {
       if (!employee.email) continue;
       const inviteResult = await createPendingInviteAndSendEmail(admin, ownerId, {
         email: employee.email,

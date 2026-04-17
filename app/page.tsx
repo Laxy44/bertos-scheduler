@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "../lib/supabase-server";
 import AppShell from "../components/layout/AppShell";
+import { getLinkedProfileEmployee } from "@/lib/profile-employee";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { maybeSendWelcomeEmailForUser } from "../lib/welcome-email-trigger";
 
 type ProfileRow = {
@@ -96,6 +97,12 @@ export default async function Page() {
   if (!activeCompanyId) {
     redirect("/create-company");
   }
+
+  await getLinkedProfileEmployee(supabase, {
+    userId: user.id,
+    authEmail: user.email ?? null,
+    companyId: activeCompanyId,
+  });
 
   return (
     <AppShell

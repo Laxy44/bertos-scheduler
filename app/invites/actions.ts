@@ -97,18 +97,18 @@ export async function cancelInvite(formData: FormData) {
     redirect("/invites?message=Only company owners or admins can manage invites");
   }
 
-  const deleteResult = await supabase
+  const revokeResult = await supabase
     .from("invites")
-    .delete()
+    .update({ status: "revoked" })
     .eq("id", inviteId)
     .eq("company_id", activeMembership.company_id)
     .eq("status", "pending");
 
-  if (deleteResult.error) {
-    redirect(`/invites?message=${encodeURIComponent(deleteResult.error.message)}`);
+  if (revokeResult.error) {
+    redirect(`/invites?message=${encodeURIComponent(revokeResult.error.message)}`);
   }
 
-  redirect("/invites?message=Invite cancelled");
+  redirect("/invites?message=Invite revoked");
 }
 
 export async function resendInvite(formData: FormData) {
@@ -170,6 +170,17 @@ export async function resendInvite(formData: FormData) {
 
   if (resend.error) {
     redirect(`/invites?message=Resend failed: ${encodeURIComponent(resend.error.message)}`);
+  }
+
+  const extend = await supabase
+    .from("invites")
+    .update({ expires_at: new Date(Date.now() + 14 * 86400000).toISOString() })
+    .eq("id", inviteId)
+    .eq("company_id", activeMembership.company_id)
+    .eq("status", "pending");
+
+  if (extend.error) {
+    console.warn("[invites] could not extend invite expiry", extend.error.message);
   }
 
   redirect("/invites?message=Invite email resent");

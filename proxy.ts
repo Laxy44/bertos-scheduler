@@ -14,6 +14,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/create-company") ||
     pathname.startsWith("/join-invite") ||
     pathname.startsWith("/complete-account") ||
+    pathname.startsWith("/invite-link-expired") ||
     pathname.startsWith("/reset-password") ||
     pathname.startsWith("/workspace-conflict");
 
@@ -50,10 +51,14 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/auth/callback" && authCode) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
     if (exchangeError) {
+      const flow = searchParams.get("flow");
       const errUrl = request.nextUrl.clone();
-      errUrl.pathname = "/auth/error";
+      errUrl.pathname = flow === "signup" ? "/auth/error" : "/invite-link-expired";
       errUrl.search = "";
-      errUrl.searchParams.set("message", exchangeError.message);
+      errUrl.searchParams.set(
+        "message",
+        exchangeError.message || "This sign-in link is invalid or has expired."
+      );
       return NextResponse.redirect(errUrl);
     }
   }
@@ -107,6 +112,7 @@ export async function proxy(request: NextRequest) {
     const isCreateCompanyPath = pathname.startsWith("/create-company");
     const isJoinInvitePath = pathname.startsWith("/join-invite");
     const isCompleteAccountPath = pathname.startsWith("/complete-account");
+    const isInviteRecoveryPath = pathname.startsWith("/invite-link-expired");
     const isResetPasswordPath = pathname.startsWith("/reset-password");
 
     if (pathname === "/login" && !isRecoveryMode) {
@@ -121,6 +127,7 @@ export async function proxy(request: NextRequest) {
       !isCreateCompanyPath &&
       !isJoinInvitePath &&
       !isCompleteAccountPath &&
+      !isInviteRecoveryPath &&
       !isResetPasswordPath
     ) {
       const createCompanyUrl = request.nextUrl.clone();
@@ -129,7 +136,10 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(createCompanyUrl);
     }
 
-    if (hasActiveCompany && (isCreateCompanyPath || isJoinInvitePath || isCompleteAccountPath)) {
+    if (
+      hasActiveCompany &&
+      (isCreateCompanyPath || isJoinInvitePath || isCompleteAccountPath || isInviteRecoveryPath)
+    ) {
       const homeUrl = request.nextUrl.clone();
       homeUrl.pathname = "/";
       homeUrl.search = "";

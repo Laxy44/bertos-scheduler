@@ -21,6 +21,7 @@ function CallbackClientInner() {
       const code = search.get("code");
       const tokenHash = search.get("token_hash");
       const typeParam = search.get("type");
+      const flow = search.get("flow");
 
       authDebug("callback client fallback entry", {
         hasCode: Boolean(code),
@@ -48,10 +49,13 @@ function CallbackClientInner() {
             refresh_token: refreshToken,
           });
           if (error) {
+            const msg =
+              error.message ||
+              "This sign-in link has expired or was already used. Request a fresh invite email.";
             router.replace(
-              authErrorPath(
-                "This auth link has expired or was already used. Request a new one."
-              )
+              flow === "signup"
+                ? authErrorPath(msg)
+                : `/invite-link-expired?message=${encodeURIComponent(msg)}`
             );
             return;
           }
@@ -67,7 +71,11 @@ function CallbackClientInner() {
               | "email",
           });
           if (otpError) {
-            router.replace(authErrorPath(otpError.message));
+            router.replace(
+              flow === "signup"
+                ? authErrorPath(otpError.message)
+                : `/invite-link-expired?message=${encodeURIComponent(otpError.message)}`
+            );
             return;
           }
         } else {

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { resolveAuthCallbackDestination } from "../../../lib/auth-callback-redirect";
+import { resolveAuthCallbackDestinationServer } from "../../../lib/auth-callback-redirect-server";
 import { authDebug } from "../../../lib/auth-debug";
 import { createServerSupabaseClient } from "../../../lib/supabase-server";
 import { CallbackClientFallback } from "./callback-client-fallback";
@@ -27,8 +27,17 @@ export default async function AuthCallbackPage({ searchParams }: { searchParams:
   const code = sp.get("code");
   const tokenHash = sp.get("token_hash");
   const typeParam = sp.get("type");
+  const flowKind = sp.get("flow");
 
   const supabase = await createServerSupabaseClient();
+
+  const exchangeFailureRedirect = (message: string) => {
+    const msg = message || "This sign-in link is invalid or has expired.";
+    if (flowKind === "signup") {
+      redirect(`/auth/error?message=${encodeURIComponent(msg)}`);
+    }
+    redirect(`/invite-link-expired?message=${encodeURIComponent(msg)}`);
+  };
 
   // Case 1: PKCE (?code=) — exchange on the server so session cookies are set before redirect.
   if (code) {
@@ -38,7 +47,7 @@ export default async function AuthCallbackPage({ searchParams }: { searchParams:
     if (!existing) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (error) {
-        redirect(`/auth/error?message=${encodeURIComponent(error.message)}`);
+        exchangeFailureRedirect(error.message);
       }
     }
   } else if (tokenHash && typeParam) {
@@ -54,7 +63,7 @@ export default async function AuthCallbackPage({ searchParams }: { searchParams:
         | "email",
     });
     if (error) {
-      redirect(`/auth/error?message=${encodeURIComponent(error.message)}`);
+      exchangeFailureRedirect(error.message);
     }
   } else {
     // Case 2: Hash fragment (#access_token= / #refresh_token=) is never sent to the server — client must setSession.
@@ -90,6 +99,6 @@ export default async function AuthCallbackPage({ searchParams }: { searchParams:
     );
   }
 
-  const destination = await resolveAuthCallbackDestination(supabase, sp, user);
+  const destination = await resolveAuthCallbackDestinationServer(supabase, sp, user);
   redirect(destination);
 }

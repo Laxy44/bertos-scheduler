@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { createServerSupabaseClient } from "../../lib/supabase-server";
-import { getActiveMembership } from "../../lib/auth";
 import { redirect } from "next/navigation";
+
 import OwnerOnboardingWizard from "../../components/onboarding/OwnerOnboardingWizard";
+import { getActiveMembership } from "../../lib/auth";
+import { createServerSupabaseClient } from "../../lib/supabase-server";
+import { getLatestInviteByEmail } from "../../lib/workspace-invite-admin";
+import { isInviteRowExpired } from "../../lib/workspace-invite-types";
 import { finishOwnerOnboarding } from "./onboarding-actions";
 
 type CreateCompanyPageProps = {
@@ -33,6 +36,17 @@ export default async function CreateCompanyPage({
 
   if (user && membershipId) {
     redirect("/");
+  }
+
+  if (user && !membershipId && user.email) {
+    const authEmail = user.email.trim().toLowerCase();
+    const invite = await getLatestInviteByEmail(authEmail);
+    if (invite?.status === "pending" && !isInviteRowExpired(invite)) {
+      redirect(`/complete-account?email=${encodeURIComponent(authEmail)}&verified=1`);
+    }
+    if (invite?.status === "pending" && isInviteRowExpired(invite)) {
+      redirect(`/invite-link-expired?email=${encodeURIComponent(authEmail)}&reason=window`);
+    }
   }
 
   return (

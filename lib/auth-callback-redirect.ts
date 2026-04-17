@@ -1,5 +1,8 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
+import type { WorkspaceInviteRow } from "@/lib/workspace-invite-types";
+import { isInviteRowExpired } from "@/lib/workspace-invite-types";
+
 /** Only allow same-origin path redirects (SaaS-safe, no open redirects). */
 export function getSafeNextPath(nextParam: string | null): string | null {
   if (!nextParam) return null;
@@ -16,14 +19,19 @@ export function getSafeNextPath(nextParam: string | null): string | null {
   return pathOnly;
 }
 
+type InviteLookup = (email: string) => Promise<WorkspaceInviteRow | null>;
+
 /**
  * Where to send the user after /auth/callback once a session exists.
- * Shared by server callback page and client hash fallback.
+ * - Server callback: pass `lookupInvite` = getLatestInviteByEmail (service role).
+ * - Client hash fallback: omit `lookupInvite` — URL params (next, flow, email) still route
+ *   invitees correctly; DB-backed expiry checks run on the next server navigation.
  */
 export async function resolveAuthCallbackDestination(
   supabase: SupabaseClient,
   sp: URLSearchParams,
-  user: User
+  user: User,
+  lookupInvite?: InviteLookup
 ): Promise<string> {
   const flowRaw = sp.get("flow");
   const flow = flowRaw || "default";
@@ -48,12 +56,50 @@ export async function resolveAuthCallbackDestination(
     ) {
       out.set("verified", "1");
     }
+
+    if (nextPath === "/complete-account" && lookupInvite) {
+      const targetEmail = (out.get("email") || emailFromQuery || user.email || "")
+        .trim()
+        .toLowerCase();
+      if (targetEmail) {
+        const inv = await lookupInvite(targetEmail);
+        if (inv?.status === "pending" && isInviteRowExpired(inv)) {
+          return `/invite-link-expired?email=${encodeURIComponent(targetEmail)}&reason=window`;
+        }
+        if (inv?.status === "accepted") {
+          return `/login?message=${encodeURIComponent(
+            "You have already joined this workspace. Sign in with your email and password."
+          )}`;
+        }
+        if (inv?.status === "expired" || inv?.status === "revoked") {
+          return `/invite-link-expired?email=${encodeURIComponent(targetEmail)}&reason=${encodeURIComponent(inv.status)}`;
+        }
+      }
+    }
+
     const q = out.toString();
     return q ? `${nextPath}?${q}` : nextPath;
   }
 
   if (flow === "invite" || typeParam === "invite") {
     const safeEmail = (emailFromQuery || user.email || "").trim().toLowerCase();
+    if (safeEmail && lookupInvite) {
+      const inv = await lookupInvite(safeEmail);
+      if (inv?.status === "pending" && isInviteRowExpired(inv)) {
+        return `/invite-link-expired?email=${encodeURIComponent(safeEmail)}&reason=window`;
+      }
+      if (inv?.status === "pending") {
+        return `/complete-account?email=${encodeURIComponent(safeEmail)}&verified=1`;
+      }
+      if (inv?.status === "accepted") {
+        return `/login?message=${encodeURIComponent(
+          "You have already joined this workspace. Sign in with your email and password."
+        )}`;
+      }
+      if (inv?.status === "expired" || inv?.status === "revoked") {
+        return `/invite-link-expired?email=${encodeURIComponent(safeEmail)}&reason=${encodeURIComponent(inv.status)}`;
+      }
+    }
     return safeEmail
       ? `/complete-account?email=${encodeURIComponent(safeEmail)}&verified=1`
       : "/complete-account?verified=1";
@@ -79,6 +125,25 @@ export async function resolveAuthCallbackDestination(
 
   if (!membership.error && membership.data?.company_id) {
     return "/";
+  }
+
+  const authEmail = (user.email || "").trim().toLowerCase();
+  if (authEmail && lookupInvite) {
+    const inv = await lookupInvite(authEmail);
+    if (inv?.status === "pending") {
+      if (isInviteRowExpired(inv)) {
+        return `/invite-link-expired?email=${encodeURIComponent(authEmail)}&reason=window`;
+      }
+      return `/complete-account?email=${encodeURIComponent(authEmail)}&verified=1`;
+    }
+    if (inv?.status === "accepted") {
+      return `/login?message=${encodeURIComponent(
+        "You have already joined this workspace. Sign in with your email and password."
+      )}`;
+    }
+    if (inv?.status === "expired" || inv?.status === "revoked") {
+      return `/invite-link-expired?email=${encodeURIComponent(authEmail)}&reason=${encodeURIComponent(inv.status)}`;
+    }
   }
 
   return "/create-company";
