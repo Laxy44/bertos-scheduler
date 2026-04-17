@@ -127,7 +127,9 @@ async function handleLogout() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [isHomeMenuOpen, setIsHomeMenuOpen] = useState(false);
+  const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
   const homeMenuRef = useRef<HTMLDivElement | null>(null);
+  const scheduleMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
   async function fetchEmployees() {
@@ -199,9 +201,12 @@ async function handleLogout() {
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
-      if (!homeMenuRef.current) return;
-      if (!homeMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (homeMenuRef.current && !homeMenuRef.current.contains(target)) {
         setIsHomeMenuOpen(false);
+      }
+      if (scheduleMenuRef.current && !scheduleMenuRef.current.contains(target)) {
+        setIsScheduleMenuOpen(false);
       }
     }
 
@@ -1922,11 +1927,25 @@ async function handleLogout() {
   function openHomeMenuTab(tab: AppTab) {
     setActiveTab(tab);
     setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
   }
 
   function openHomeMenuRoute(path: string) {
     router.push(path);
     setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+  }
+
+  function openScheduleMenuTab(tab: AppTab) {
+    setActiveTab(tab);
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+  }
+
+  function openScheduleMenuRoute(path: string) {
+    router.push(path);
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
   }
 
   const dashboardDisplayName = useMemo(() => {
@@ -2201,7 +2220,10 @@ async function handleLogout() {
           <div className="relative" ref={homeMenuRef}>
             <button
               type="button"
-              onClick={() => setIsHomeMenuOpen((current) => !current)}
+              onClick={() => {
+                setIsHomeMenuOpen((current) => !current);
+                setIsScheduleMenuOpen(false);
+              }}
               className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                 activeTab === "home" || isHomeMenuOpen
                   ? "bg-slate-900 text-white"
@@ -2264,8 +2286,76 @@ async function handleLogout() {
               </div>
             ) : null}
           </div>
+          <div className="relative" ref={scheduleMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsScheduleMenuOpen((current) => !current);
+                setIsHomeMenuOpen(false);
+              }}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                activeTab === "schedule" || isScheduleMenuOpen
+                  ? "bg-slate-900 text-white"
+                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              Schedule <span className="ml-1 text-xs">▾</span>
+            </button>
+            {isScheduleMenuOpen ? (
+              <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => openScheduleMenuTab("schedule")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Schedule
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openScheduleMenuRoute("/pending-requests")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Pending requests
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openScheduleMenuRoute("/punch-clock")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Punch Clock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openScheduleMenuRoute("/availability")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Availability
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openScheduleMenuRoute("/leave-requests")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Leave requests
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openScheduleMenuRoute("/contracted-hours")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Contracted hours
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openScheduleMenuRoute("/leave-accounts")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Leave accounts
+                </button>
+              </div>
+            ) : null}
+          </div>
           {[
-  { key: "schedule", label: "Schedule" },
   { key: "week", label: "Week View" },
   { key: "month", label: "Month View" },
   ...(isAdmin
