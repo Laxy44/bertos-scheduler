@@ -1,6 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const ShiftMiniCard = ({
   shift,
@@ -94,6 +94,39 @@ export default function ScheduleSection({
   dayWorkedHours,
 }: any) {
   const [activeEmployeeRow, setActiveEmployeeRow] = useState<string | null>(null);
+  const [openToolbarMenu, setOpenToolbarMenu] = useState<
+    "view" | "templates" | "tools" | "filters" | null
+  >(null);
+  const [selectedViewLabel, setSelectedViewLabel] = useState("Week");
+  const [selectedTemplateLabel, setSelectedTemplateLabel] = useState("Shift templates");
+  const [selectedToolsLabel, setSelectedToolsLabel] = useState("Bulk actions");
+  const [selectedFiltersLabel, setSelectedFiltersLabel] = useState("All shifts");
+  const toolbarMenuRef = useRef<HTMLDivElement | null>(null);
+  const viewOptions = ["Day", "Week", "2 Weeks", "Month"];
+  const templateOptions = ["Shift templates", "Saved patterns", "Import template"];
+  const toolsOptions = ["Bulk actions", "Copy week", "Auto assign"];
+  const filtersOptions = ["All shifts", "Unpublished", "Unassigned"];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!toolbarMenuRef.current) return;
+      if (toolbarMenuRef.current.contains(event.target as Node)) return;
+      setOpenToolbarMenu(null);
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpenToolbarMenu(null);
+      }
+    }
+
+    window.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
 
   const scheduleGridEmployees =
     employeeFilter === "All"
@@ -212,10 +245,67 @@ export default function ScheduleSection({
     <section className="space-y-4 rounded-3xl bg-white p-5 shadow-sm">
       <div className="sticky top-16 z-40 rounded-2xl border border-slate-200 bg-slate-50/95 p-4 shadow-sm backdrop-blur">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 active:scale-[0.99]">
-              Week
-            </button>
+          <div className="flex flex-wrap items-center gap-2" ref={toolbarMenuRef}>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() =>
+                  setOpenToolbarMenu((current) => (current === "view" ? null : "view"))
+                }
+                aria-haspopup="menu"
+                aria-expanded={openToolbarMenu === "view"}
+                className={`inline-flex min-w-[132px] items-center justify-between rounded-xl border px-3 py-2 text-sm font-semibold transition active:scale-[0.99] ${
+                  openToolbarMenu === "view"
+                    ? "border-slate-300 bg-slate-100 text-slate-900"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                <span>{selectedViewLabel}</span>
+                <span
+                  className={`ml-2 text-xs text-slate-500 transition-transform duration-150 ${
+                    openToolbarMenu === "view" ? "rotate-180" : ""
+                  }`}
+                >
+                  ▾
+                </span>
+              </button>
+              <div
+                className={`absolute left-0 top-[calc(100%+8px)] z-50 w-[180px] origin-top rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.14)] transition duration-150 ${
+                  openToolbarMenu === "view"
+                    ? "pointer-events-auto translate-y-0 opacity-100"
+                    : "pointer-events-none -translate-y-1 opacity-0"
+                }`}
+                role="menu"
+              >
+                {viewOptions.map((option) => {
+                  const isActive = selectedViewLabel === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={isActive}
+                      onClick={() => {
+                        setSelectedViewLabel(option);
+                        setOpenToolbarMenu(null);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                        isActive
+                          ? "bg-slate-100 font-semibold text-slate-900"
+                          : "font-medium text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>{option}</span>
+                      <span
+                        className={`text-xs ${isActive ? "text-slate-700" : "text-transparent"}`}
+                      >
+                        ✓
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <button type="button" onClick={goToday} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 active:scale-[0.99]">
               Today
             </button>
@@ -226,11 +316,194 @@ export default function ScheduleSection({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {["View settings", "Templates", "Tools", "Filters"].map((label) => (
-              <button key={label} type="button" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 active:scale-[0.99]">
-                {label}
+            <button
+              type="button"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 active:scale-[0.99]"
+            >
+              View settings
+            </button>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() =>
+                  setOpenToolbarMenu((current) =>
+                    current === "templates" ? null : "templates"
+                  )
+                }
+                aria-haspopup="menu"
+                aria-expanded={openToolbarMenu === "templates"}
+                className={`inline-flex min-w-[136px] items-center justify-between rounded-xl border px-3 py-2 text-sm font-medium transition active:scale-[0.99] ${
+                  openToolbarMenu === "templates"
+                    ? "border-slate-300 bg-slate-100 text-slate-900"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                Templates
+                <span
+                  className={`ml-2 text-xs text-slate-500 transition-transform duration-150 ${
+                    openToolbarMenu === "templates" ? "rotate-180" : ""
+                  }`}
+                >
+                  ▾
+                </span>
               </button>
-            ))}
+              <div
+                className={`absolute left-0 top-[calc(100%+8px)] z-50 w-[200px] origin-top rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.14)] transition duration-150 ${
+                  openToolbarMenu === "templates"
+                    ? "pointer-events-auto translate-y-0 opacity-100"
+                    : "pointer-events-none -translate-y-1 opacity-0"
+                }`}
+                role="menu"
+              >
+                {templateOptions.map((option) => {
+                  const isActive = selectedTemplateLabel === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={isActive}
+                      onClick={() => {
+                        setSelectedTemplateLabel(option);
+                        setOpenToolbarMenu(null);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                        isActive
+                          ? "bg-slate-100 font-semibold text-slate-900"
+                          : "font-medium text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>{option}</span>
+                      <span className={`text-xs ${isActive ? "text-slate-700" : "text-transparent"}`}>
+                        ✓
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() =>
+                  setOpenToolbarMenu((current) => (current === "tools" ? null : "tools"))
+                }
+                aria-haspopup="menu"
+                aria-expanded={openToolbarMenu === "tools"}
+                className={`inline-flex min-w-[124px] items-center justify-between rounded-xl border px-3 py-2 text-sm font-medium transition active:scale-[0.99] ${
+                  openToolbarMenu === "tools"
+                    ? "border-slate-300 bg-slate-100 text-slate-900"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                Tools
+                <span
+                  className={`ml-2 text-xs text-slate-500 transition-transform duration-150 ${
+                    openToolbarMenu === "tools" ? "rotate-180" : ""
+                  }`}
+                >
+                  ▾
+                </span>
+              </button>
+              <div
+                className={`absolute left-0 top-[calc(100%+8px)] z-50 w-[190px] origin-top rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.14)] transition duration-150 ${
+                  openToolbarMenu === "tools"
+                    ? "pointer-events-auto translate-y-0 opacity-100"
+                    : "pointer-events-none -translate-y-1 opacity-0"
+                }`}
+                role="menu"
+              >
+                {toolsOptions.map((option) => {
+                  const isActive = selectedToolsLabel === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={isActive}
+                      onClick={() => {
+                        setSelectedToolsLabel(option);
+                        setOpenToolbarMenu(null);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                        isActive
+                          ? "bg-slate-100 font-semibold text-slate-900"
+                          : "font-medium text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>{option}</span>
+                      <span className={`text-xs ${isActive ? "text-slate-700" : "text-transparent"}`}>
+                        ✓
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() =>
+                  setOpenToolbarMenu((current) =>
+                    current === "filters" ? null : "filters"
+                  )
+                }
+                aria-haspopup="menu"
+                aria-expanded={openToolbarMenu === "filters"}
+                className={`inline-flex min-w-[130px] items-center justify-between rounded-xl border px-3 py-2 text-sm font-medium transition active:scale-[0.99] ${
+                  openToolbarMenu === "filters"
+                    ? "border-slate-300 bg-slate-100 text-slate-900"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                Filters
+                <span
+                  className={`ml-2 text-xs text-slate-500 transition-transform duration-150 ${
+                    openToolbarMenu === "filters" ? "rotate-180" : ""
+                  }`}
+                >
+                  ▾
+                </span>
+              </button>
+              <div
+                className={`absolute left-0 top-[calc(100%+8px)] z-50 w-[190px] origin-top rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.14)] transition duration-150 ${
+                  openToolbarMenu === "filters"
+                    ? "pointer-events-auto translate-y-0 opacity-100"
+                    : "pointer-events-none -translate-y-1 opacity-0"
+                }`}
+                role="menu"
+              >
+                {filtersOptions.map((option) => {
+                  const isActive = selectedFiltersLabel === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={isActive}
+                      onClick={() => {
+                        setSelectedFiltersLabel(option);
+                        setOpenToolbarMenu(null);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                        isActive
+                          ? "bg-slate-100 font-semibold text-slate-900"
+                          : "font-medium text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>{option}</span>
+                      <span className={`text-xs ${isActive ? "text-slate-700" : "text-transparent"}`}>
+                        ✓
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <button type="button" className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.99]">
               Publish shifts
             </button>
