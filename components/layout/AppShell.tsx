@@ -2,7 +2,7 @@
 
 
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "../../lib/supabase";
 import WeekNavigator from "../schedule/WeekNavigator";
 import ScheduleSection from "../schedule/ScheduleSection";
@@ -126,6 +126,8 @@ async function handleLogout() {
     useState<EmployeeConfig[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
+  const [isHomeMenuOpen, setIsHomeMenuOpen] = useState(false);
+  const homeMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
   async function fetchEmployees() {
@@ -194,6 +196,20 @@ async function handleLogout() {
   fetchEmployees();
   fetchShifts();
 }, [activeCompanyId, supabase]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (!homeMenuRef.current) return;
+      if (!homeMenuRef.current.contains(event.target as Node)) {
+        setIsHomeMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [weekStart, setWeekStart] = useState<Date>(todayWeekStart);
   const [selectedDate, setSelectedDate] = useState(todayDate);
@@ -1903,6 +1919,16 @@ async function handleLogout() {
     setActiveTab("payroll");
   }
 
+  function openHomeMenuTab(tab: AppTab) {
+    setActiveTab(tab);
+    setIsHomeMenuOpen(false);
+  }
+
+  function openHomeMenuRoute(path: string) {
+    router.push(path);
+    setIsHomeMenuOpen(false);
+  }
+
   const dashboardDisplayName = useMemo(() => {
     const source = (employeeName || "").trim();
     if (!source) return "there";
@@ -2172,8 +2198,73 @@ async function handleLogout() {
 
         {/* TOP NAVIGATION TABS */}
         <div className="mb-4 flex flex-wrap gap-2">
+          <div className="relative" ref={homeMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsHomeMenuOpen((current) => !current)}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                activeTab === "home" || isHomeMenuOpen
+                  ? "bg-slate-900 text-white"
+                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              Home <span className="ml-1 text-xs">▾</span>
+            </button>
+            {isHomeMenuOpen ? (
+              <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => openHomeMenuTab("home")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Home
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openHomeMenuTab("schedule")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Your schedule
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openHomeMenuRoute("/your-availability")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Your availability
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openHomeMenuRoute("/your-leave-overview")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Your leave overview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openHomeMenuRoute("/payslips")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Payslips
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openHomeMenuRoute("/news")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  News
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openHomeMenuRoute("/events")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Events
+                </button>
+              </div>
+            ) : null}
+          </div>
           {[
-  { key: "home", label: "Home" },
   { key: "schedule", label: "Schedule" },
   { key: "week", label: "Week View" },
   { key: "month", label: "Month View" },
