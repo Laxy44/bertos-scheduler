@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { createCompany } from "./actions";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 import { getActiveMembership } from "../../lib/auth";
 import { redirect } from "next/navigation";
+import OwnerOnboardingWizard from "../../components/onboarding/OwnerOnboardingWizard";
+import { finishOwnerOnboarding } from "./onboarding-actions";
 
 type CreateCompanyPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -25,6 +26,7 @@ export default async function CreateCompanyPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const userEmail = user?.email || "";
 
   const membershipId = user ? await getActiveMembership(supabase, user.id) : null;
   const isLoggedInWithoutMembership = Boolean(user && !membershipId);
@@ -36,74 +38,16 @@ export default async function CreateCompanyPage({
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-slate-900">Create company</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Set up Planyo</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Set up your business workspace as the owner.
+          Complete the onboarding steps to launch your workspace.
         </p>
-
-        {message ? (
-          <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-amber-200">
-            {message}
-          </div>
-        ) : null}
-
-        <form action={createCompany} className="mt-6 space-y-4" autoComplete="off">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Company Name
-            </label>
-            <input
-              name="companyName"
-              type="text"
-              required
-              autoComplete="off"
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-              placeholder="Your Company ApS"
-            />
-          </div>
-
-          {!isLoggedInWithoutMembership ? (
-            <>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Owner Email
-                </label>
-                <input
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="off"
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                  placeholder="owner@company.com"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Owner Password
-                </label>
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="new-password"
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                  placeholder="Create a secure password"
-                />
-              </div>
-            </>
-          ) : (
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-200">
-              You are logged in. This company will be created under your current account.
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="w-full rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-800"
-          >
-            Create company
-          </button>
-        </form>
+        <OwnerOnboardingWizard
+          action={finishOwnerOnboarding}
+          initialMessage={message}
+          isLoggedInWithoutMembership={isLoggedInWithoutMembership}
+          existingUserEmail={userEmail}
+        />
 
         <div className="mt-4 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
           <p className="text-sm font-medium text-slate-700">Invited employees</p>
