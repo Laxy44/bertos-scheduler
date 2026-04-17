@@ -55,12 +55,9 @@ export default function HomeDashboardSection({
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
           Planyo Setup Hub
         </p>
-        <h2 className="mt-2 text-2xl font-bold text-slate-900">Welcome back, {displayName} 👋</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Here&apos;s your quick setup guide to get your workspace ready.
-        </p>
-        <p className="mt-1 text-sm text-slate-500">
-          Workspace: <span className="font-semibold text-slate-700">{workspaceName}</span>
+        <h2 className="mt-2 text-lg font-semibold text-slate-900">Hi, {displayName}</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Here&apos;s your quick setup guide to get <span className="font-medium text-slate-800">{workspaceName}</span> ready.
         </p>
 
         <div className="mt-5">

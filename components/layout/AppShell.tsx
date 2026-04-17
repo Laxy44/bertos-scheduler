@@ -2119,128 +2119,188 @@ async function handleLogout() {
           <option key={role} value={role} />
         ))}
       </datalist>
-      <div className="mx-auto max-w-7xl p-4 md:p-8">
-        <div className="mb-6 rounded-3xl border border-slate-200 bg-slate-900 p-6 text-white shadow-lg">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-[0.25em] text-slate-400">
-                Planyo • Workspace Dashboard
-              </p>
-              <h1 className="mt-2 text-3xl font-bold md:text-4xl">
-                {isAdmin ? "Let’s plan your week" : "Welcome back 👋"}
-              </h1>
-              <p className="mt-2 text-slate-400">
-                {workspaceName}
-                {workspaceCvr ? ` • CVR: ${workspaceCvr}` : ""}
-              </p>
-
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-200 ring-1 ring-white/10">
-                  {normalizedRole}
-                </span>
-                {employeeName ? (
-                  <span className="rounded-full bg-white/5 px-3 py-1 text-sm text-slate-300 ring-1 ring-white/10">
-                    Signed in as {employeeName}
-                  </span>
-                ) : null}
+      <div className="mx-auto max-w-7xl px-4 pb-6 pt-3 md:px-8 md:pt-4">
+        {/* A. Top bar — compact */}
+        <header className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-slate-200/90 bg-white px-3 py-2 shadow-sm md:px-4 md:py-2.5">
+          <span className="text-base font-semibold tracking-tight text-slate-900 md:text-lg">
+            Planyo
+          </span>
+          <div className="relative" ref={userMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsUserMenuOpen((current) => !current);
+                setIsHomeMenuOpen(false);
+                setIsScheduleMenuOpen(false);
+                setIsPeopleMenuOpen(false);
+                setIsPayrollMenuOpen(false);
+                setIsSettingsMenuOpen(false);
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition md:px-3 ${
+                isUserMenuOpen
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              {navUserLabel}
+              <span className="text-xs opacity-70">▾</span>
+            </button>
+            {isUserMenuOpen ? (
+              <div className="absolute right-0 z-40 mt-1.5 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => openUserMenuRoute("/profile")}
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                >
+                  Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openUserMenuRoute("/account")}
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                >
+                  Account
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-600 transition hover:bg-slate-50"
+                >
+                  Log out
+                </button>
               </div>
+            ) : null}
+          </div>
+        </header>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+        {/* B + C — dashboard hero + actions/stats (home only) */}
+        {activeTab === "home" ? (
+          <div className="mb-6 rounded-2xl border border-slate-200/80 bg-gradient-to-b from-slate-50 via-white to-white p-5 shadow-sm md:p-6">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+                {isAdmin ? "Let’s plan your week 👋" : "Welcome back 👋"}
+              </h1>
+              <p className="text-sm text-slate-500">
+                {workspaceName}
+                {workspaceCvr ? (
+                  <span className="text-slate-400"> · CVR {workspaceCvr}</span>
+                ) : null}
+              </p>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center gap-3">
                 {isAdmin ? (
                   <button
+                    type="button"
                     onClick={openCreateShiftFromHeader}
-                    className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
                   >
-                    + Create Shift
+                    Create Shift
                   </button>
                 ) : null}
                 {isAdmin ? (
                   <button
+                    type="button"
                     onClick={openAddEmployeeFromHeader}
-                    className="rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20"
+                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
                   >
-                    + Add Employee
+                    Add Employee
                   </button>
                 ) : null}
                 {normalizedRole === "owner" ? (
                   <Link
                     href="/invites"
-                    className="inline-block rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20"
+                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
                   >
-                    Invite Team
+                    Invite
                   </Link>
                 ) : null}
                 <button
+                  type="button"
                   onClick={handleLogout}
-                  className="rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20"
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
                 >
-                Logout
-              </button>
-            </div>
+                  Log out
+                </button>
+              </div>
 
-
-
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 md:w-[660px]">
-              {isAdmin ? (
-                <>
-                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
-                      Total Shifts
-                    </p>
-                    <p className="mt-1 text-3xl font-bold leading-none">{shifts.length}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
-                      {selectedDayName} Planned
-                    </p>
-                    <p className="mt-1 text-3xl font-bold leading-none">{dayHours.toFixed(1)}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
-                      {selectedDayName} Actual
-                    </p>
-                    <p className="mt-1 text-3xl font-bold leading-none">{dayWorkedHours.toFixed(1)}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
-                      Active Employees
-                    </p>
-                    <p className="mt-1 text-3xl font-bold leading-none">{activeEmployees.length}</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
-                      My Shifts
-                    </p>
-                    <p className="mt-1 text-3xl font-bold leading-none">{myStats.shifts}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
-                      Planned Hours
-                    </p>
-                    <p className="mt-1 text-3xl font-bold leading-none">{myStats.planned.toFixed(1)}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
-                      Approved Hours
-                    </p>
-                    <p className="mt-1 text-3xl font-bold leading-none">{myStats.approved.toFixed(1)}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
-                      Worked Hours
-                    </p>
-                    <p className="mt-1 text-3xl font-bold leading-none">{myStats.worked.toFixed(1)}</p>
-                  </div>
-                </>
-              )}
-            </div>
+              <div className="grid w-full min-w-0 grid-cols-2 gap-3 sm:grid-cols-4 lg:w-auto lg:max-w-2xl lg:flex-1">
+                {isAdmin ? (
+                  <>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Total Shifts
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {shifts.length}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Planned Hours
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {dayHours.toFixed(1)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Actual Hours
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {dayWorkedHours.toFixed(1)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Employees
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {activeEmployees.length}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        My Shifts
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {myStats.shifts}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Planned Hours
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {myStats.planned.toFixed(1)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Approved Hours
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {myStats.approved.toFixed(1)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Worked Hours
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {myStats.worked.toFixed(1)}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
+        ) : null}
 
         {!isAdmin && employeeName ? (
           <div className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -2310,7 +2370,7 @@ async function handleLogout() {
         ) : null}
 
         {/* TOP NAVIGATION TABS */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
           <div className="flex flex-wrap gap-2">
             <div className="relative" ref={homeMenuRef}>
             <button
@@ -2650,51 +2710,6 @@ async function handleLogout() {
               {tab.label}
             </button>
           ))}
-          </div>
-          <div className="relative" ref={userMenuRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setIsUserMenuOpen((current) => !current);
-                setIsHomeMenuOpen(false);
-                setIsScheduleMenuOpen(false);
-                setIsPeopleMenuOpen(false);
-                setIsPayrollMenuOpen(false);
-                setIsSettingsMenuOpen(false);
-              }}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-                isUserMenuOpen
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              {navUserLabel} <span className="ml-1 text-xs">▾</span>
-            </button>
-            {isUserMenuOpen ? (
-              <div className="absolute right-0 z-30 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                <button
-                  type="button"
-                  onClick={() => openUserMenuRoute("/profile")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Profile
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openUserMenuRoute("/account")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Account
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Log out
-                </button>
-              </div>
-            ) : null}
           </div>
         </div>
 
