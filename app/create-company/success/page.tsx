@@ -33,14 +33,17 @@ export default async function CreateCompanySuccessPage({
           </p>
         ) : (
           <p className="mt-2 text-sm text-slate-600">
-            We sent a confirmation email to activate your owner account. After confirming, return
-            to login to enter Planyo.
+            We sent a confirmation email to your address. Open your inbox and click the
+            confirmation link to activate your workspace.
           </p>
         )}
 
         {!isExisting && ownerEmail ? (
           <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200">
-            Confirmation email: <span className="font-semibold">{ownerEmail}</span>
+            Confirmation email sent to:{" "}
+            <a href={`mailto:${ownerEmail}`} className="font-semibold text-slate-900 underline">
+              {ownerEmail}
+            </a>
           </p>
         ) : null}
 
@@ -67,7 +70,7 @@ export default async function CreateCompanySuccessPage({
           ) : (
             <>
               <a
-                href="https://mail.google.com"
+                href="https://mail.google.com/mail/u/0/#inbox"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
@@ -93,6 +96,11 @@ export default async function CreateCompanySuccessPage({
                   Resend email
                 </button>
               </form>
+
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200">
+                <p>Check your inbox or spam folder if you don&apos;t see the email.</p>
+                <p className="mt-1">You can close this tab after confirming your email.</p>
+              </div>
             </>
           )}
         </div>

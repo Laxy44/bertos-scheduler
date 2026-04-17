@@ -31,7 +31,7 @@ export function LoginForm({
 
         {confirmed ? (
           <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 ring-1 ring-emerald-200">
-            Email confirmed. You can now log in to enter your workspace.
+            Email confirmed successfully. You can now log in.
           </div>
         ) : null}
 
