@@ -14,6 +14,8 @@ export type Shift = {
 
 export type EmployeeConfig = {
   id?: string;
+  /** When set, matches auth.users(id) for this employee row */
+  userId?: string | null;
   name: string;
   hourlyRate: number;
   defaultRole: string;

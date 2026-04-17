@@ -53,15 +53,15 @@ type EmployeeEditPanelProps = {
     unavailableDates: string[];
     active: boolean;
   };
-  updateEmployeeName: (oldName: string, newName: string) => void;
+  updateEmployeeName: (oldName: string, newName: string) => Promise<void>;
   updateEmployeeRate: (name: string, newRate: number) => Promise<void>;
   updateEmployeeRole: (name: string, newRole: string) => Promise<void>;
-  setEmployeeActiveStatus: (name: string, active: boolean) => void;
+  setEmployeeActiveStatus: (name: string, active: boolean) => Promise<void>;
   deleteEmployee: (name: string) => Promise<void>;
   availabilityDrafts: Record<string, string>;
   updateAvailabilityDraft: (name: string, value: string) => void;
-  addUnavailableDate: (name: string) => void;
-  removeUnavailableDate: (name: string, date: string) => void;
+  addUnavailableDate: (name: string) => Promise<void>;
+  removeUnavailableDate: (name: string, date: string) => Promise<void>;
 };
 
 function EmployeeEditPanel({
@@ -144,7 +144,7 @@ function EmployeeEditPanel({
       await updateEmployeeRate(employee.name, rate);
       await updateEmployeeRole(employee.name, defaultRole.trim());
       if (fullName !== employee.name.trim()) {
-        updateEmployeeName(employee.name, fullName);
+        await updateEmployeeName(employee.name, fullName);
       }
     } finally {
       setIsSaving(false);

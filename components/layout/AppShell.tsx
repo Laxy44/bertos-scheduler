@@ -2,9 +2,10 @@
 
 
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "../../lib/supabase";
 import ScheduleSection from "../schedule/ScheduleSection";
+import WorkspaceAppNav from "./WorkspaceAppNav";
 import WeekSection from "../schedule/WeekSection";
 import MonthSection from "../month/MonthSection";
 import PayrollSection from "../payroll/PayrollSection";
@@ -30,6 +31,7 @@ import {
   roles,
 } from "../../lib/constants";
 
+import { isCompanyAdminRole } from "../../lib/workspace-role";
 import {
   addDays,
   formatDKK,
@@ -100,7 +102,7 @@ export default function AppShell({
   activeCompanyId,
 }: AppShellProps) {
   const normalizedRole = (role || "employee").toLowerCase();
-  const isAdmin = ["owner", "admin", "manager"].includes(normalizedRole);
+  const isAdmin = isCompanyAdminRole(role);
   const workspaceName = companyName || "Workspace";
   const workspaceCvr = companyCvr || "";
   const supabase = createClient();
@@ -131,109 +133,198 @@ async function handleLogout() {
   const [isPayrollMenuOpen, setIsPayrollMenuOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const homeMenuRef = useRef<HTMLDivElement | null>(null);
-  const scheduleMenuRef = useRef<HTMLDivElement | null>(null);
-  const peopleMenuRef = useRef<HTMLDivElement | null>(null);
-  const payrollMenuRef = useRef<HTMLDivElement | null>(null);
-  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
-  const userMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
 
   useEffect(() => {
-  async function fetchEmployees() {
-    if (!activeCompanyId) {
-      setEmployees([]);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("employees")
-      .select("*")
-      .eq("company_id", activeCompanyId);
-
-    if (error) {
-      console.log("Error fetching employees:", error);
-      return;
-    }
-
-    const mappedEmployees: any[] = (data || []).map((emp) => ({
-      id: emp.id,
-      name: emp.name,
-      hourlyRate: Number(emp.hourly_rate),
-      defaultRole: emp.default_role,
-      unavailableDates: Array.isArray(emp.unavailable_dates) ? emp.unavailable_dates : [],
-      active: emp.active,
-    }));
-
-    setEmployees(mappedEmployees);
-  }
-
-  async function fetchShifts() {
-    if (!activeCompanyId) {
-      setShifts([]);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("shifts")
-      .select("*")
-      .eq("company_id", activeCompanyId)
-      .order("date", { ascending: true })
-      .order("start", { ascending: true });
-
-    if (error) {
-      console.log("Error fetching shifts:", error);
-      return;
-    }
-
-    const mappedShifts: Shift[] = (data || []).map((shift) => ({
-      id: shift.id,
-      employee: shift.employee,
-      day: getDayNameFromDate(shift.date),
-      role: shift.role,
-      start: shift.start,
-      end: shift.end,
-      notes: shift.notes || "",
-      date: shift.date,
-      actualStart: shift.actual_start || undefined,
-      actualEnd: shift.actual_end || undefined,
-      approved: shift.approved ?? false,
-    }));
-
-    setShifts(mappedShifts);
-  }
-
-  fetchEmployees();
-  fetchShifts();
-}, [activeCompanyId, supabase]);
-
-  useEffect(() => {
-    function handleOutsideClick(event: MouseEvent) {
-      const target = event.target as Node;
-      if (homeMenuRef.current && !homeMenuRef.current.contains(target)) {
-        setIsHomeMenuOpen(false);
+    let cancelled = false;
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) {
+        setAuthUserId(data.user?.id ?? null);
       }
-      if (scheduleMenuRef.current && !scheduleMenuRef.current.contains(target)) {
-        setIsScheduleMenuOpen(false);
-      }
-      if (peopleMenuRef.current && !peopleMenuRef.current.contains(target)) {
-        setIsPeopleMenuOpen(false);
-      }
-      if (payrollMenuRef.current && !payrollMenuRef.current.contains(target)) {
-        setIsPayrollMenuOpen(false);
-      }
-      if (settingsMenuRef.current && !settingsMenuRef.current.contains(target)) {
-        setIsSettingsMenuOpen(false);
-      }
-      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
-        setIsUserMenuOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleOutsideClick);
+    });
     return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
+      cancelled = true;
     };
+  }, [supabase]);
+
+  useEffect(() => {
+    async function fetchEmployees() {
+      if (!activeCompanyId) {
+        setEmployees([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("employees")
+        .select("*")
+        .eq("company_id", activeCompanyId);
+
+      if (error) {
+        console.log("Error fetching employees:", error);
+        return;
+      }
+
+      const mappedEmployees: EmployeeConfig[] = (data || []).map((emp) => ({
+        id: emp.id,
+        userId: emp.user_id ?? null,
+        name: emp.name,
+        hourlyRate: Number(emp.hourly_rate),
+        defaultRole: emp.default_role,
+        unavailableDates: Array.isArray(emp.unavailable_dates) ? emp.unavailable_dates : [],
+        active: emp.active,
+      }));
+
+      if (!isAdmin) {
+        const selfName = (employeeName || "").trim().toLowerCase();
+        const filtered = mappedEmployees.filter(
+          (emp) =>
+            (Boolean(authUserId) && emp.userId === authUserId) ||
+            emp.name.trim().toLowerCase() === selfName
+        );
+        setEmployees(filtered);
+      } else {
+        setEmployees(mappedEmployees);
+      }
+    }
+
+    async function fetchShifts() {
+      if (!activeCompanyId) {
+        setShifts([]);
+        return;
+      }
+
+      let query = supabase
+        .from("shifts")
+        .select("*")
+        .eq("company_id", activeCompanyId);
+
+      if (!isAdmin && employeeName?.trim()) {
+        query = query.eq("employee", employeeName.trim());
+      }
+
+      const { data, error } = await query
+        .order("date", { ascending: true })
+        .order("start", { ascending: true });
+
+      if (error) {
+        console.log("Error fetching shifts:", error);
+        return;
+      }
+
+      const mappedShifts: Shift[] = (data || []).map((shift) => ({
+        id: shift.id,
+        employee: shift.employee,
+        day: getDayNameFromDate(shift.date),
+        role: shift.role,
+        start: shift.start,
+        end: shift.end,
+        notes: shift.notes || "",
+        date: shift.date,
+        actualStart: shift.actual_start || undefined,
+        actualEnd: shift.actual_end || undefined,
+        approved: shift.approved ?? false,
+      }));
+
+      setShifts(mappedShifts);
+    }
+
+    void fetchEmployees();
+    void fetchShifts();
+  }, [activeCompanyId, supabase, isAdmin, employeeName, authUserId]);
+
+  useEffect(() => {
+    if (!isAdmin && (activeTab === "payroll" || activeTab === "employees")) {
+      setActiveTab("schedule");
+    }
+  }, [isAdmin, activeTab]);
+
+  const closeAllNavMenus = useCallback(() => {
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+    setIsPeopleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
   }, []);
+
+  const toggleHomeMenu = useCallback(() => {
+    if (isHomeMenuOpen) {
+      setIsHomeMenuOpen(false);
+      return;
+    }
+    setIsScheduleMenuOpen(false);
+    setIsPeopleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
+    setIsHomeMenuOpen(true);
+  }, [isHomeMenuOpen]);
+
+  const toggleScheduleMenu = useCallback(() => {
+    if (isScheduleMenuOpen) {
+      setIsScheduleMenuOpen(false);
+      return;
+    }
+    setIsHomeMenuOpen(false);
+    setIsPeopleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
+    setIsScheduleMenuOpen(true);
+  }, [isScheduleMenuOpen]);
+
+  const togglePeopleMenu = useCallback(() => {
+    if (isPeopleMenuOpen) {
+      setIsPeopleMenuOpen(false);
+      return;
+    }
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
+    setIsPeopleMenuOpen(true);
+  }, [isPeopleMenuOpen]);
+
+  const togglePayrollMenu = useCallback(() => {
+    if (isPayrollMenuOpen) {
+      setIsPayrollMenuOpen(false);
+      return;
+    }
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+    setIsPeopleMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
+    setIsPayrollMenuOpen(true);
+  }, [isPayrollMenuOpen]);
+
+  const toggleSettingsMenu = useCallback(() => {
+    if (isSettingsMenuOpen) {
+      setIsSettingsMenuOpen(false);
+      return;
+    }
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+    setIsPeopleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsUserMenuOpen(false);
+    setIsSettingsMenuOpen(true);
+  }, [isSettingsMenuOpen]);
+
+  const toggleUserMenu = useCallback(() => {
+    if (isUserMenuOpen) {
+      setIsUserMenuOpen(false);
+      return;
+    }
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+    setIsPeopleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(true);
+  }, [isUserMenuOpen]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [weekStart, setWeekStart] = useState<Date>(todayWeekStart);
   const [selectedDate, setSelectedDate] = useState(todayDate);
@@ -639,6 +730,22 @@ async function handleLogout() {
       return;
     }
 
+    const selfName = (employeeName || "").trim();
+
+    if (!isAdmin) {
+      if (selfName && form.employee.trim() !== selfName) {
+        alert("You can only schedule shifts for yourself.");
+        return;
+      }
+      if (editingId) {
+        const existing = shifts.find((s) => s.id === editingId);
+        if (existing && existing.employee !== selfName) {
+          alert("You can only edit your own shifts.");
+          return;
+        }
+      }
+    }
+
     if (activeEmployees.length === 0) {
       alert("Please add at least one active employee first.");
       return;
@@ -768,6 +875,11 @@ async function handleLogout() {
   }
 
   function startEdit(shift: Shift) {
+    if (!isAdmin && shift.employee !== (employeeName || "").trim()) {
+      alert("You can only edit your own shifts.");
+      return;
+    }
+
     setShowShiftForm(true);
     setActiveTab("schedule");
     setEditingId(shift.id);
@@ -785,6 +897,16 @@ async function handleLogout() {
   }
 
   async function deleteShift(id: string) {
+    const target = shifts.find((s) => s.id === id);
+    if (!target) {
+      alert("Shift not found.");
+      return;
+    }
+    if (!isAdmin && target.employee !== (employeeName || "").trim()) {
+      alert("You can only delete your own shifts.");
+      return;
+    }
+
     const { error } = await supabase
       .from("shifts")
       .delete()
@@ -800,7 +922,12 @@ async function handleLogout() {
     if (editingId === id) resetForm();
   }
 
-  function copyDayShifts() {
+  async function copyDayShifts() {
+    if (!isAdmin) {
+      alert("Only workspace admins can copy a full day of shifts.");
+      return;
+    }
+
     const sourceShifts = shifts.filter((shift) => shift.date === copyFromDate);
 
     if (sourceShifts.length === 0) {
@@ -871,19 +998,48 @@ async function handleLogout() {
       return;
     }
 
-    const copied = sourceShifts.map((shift) => ({
-      ...shift,
-      id: crypto.randomUUID(),
+    if (!activeCompanyId) return;
+
+    const rowsToInsert = sourceShifts.map((shift) => ({
+      company_id: activeCompanyId,
+      employee: shift.employee,
       date: selectedDate,
-      day: getDayNameFromDate(selectedDate),
-      actualStart: undefined,
-      actualEnd: undefined,
+      start: shift.start,
+      end: shift.end,
+      role: shift.role,
+      notes: shift.notes || null,
     }));
 
-    setShifts((current) => [...current, ...copied]);
+    const { data, error } = await supabase.from("shifts").insert(rowsToInsert).select();
+
+    if (error) {
+      alert(`Could not copy shifts: ${error.message}`);
+      return;
+    }
+
+    const inserted: Shift[] = (data || []).map((row) => ({
+      id: row.id,
+      employee: row.employee,
+      date: row.date,
+      start: row.start,
+      end: row.end,
+      role: row.role,
+      notes: row.notes || "",
+      day: getDayNameFromDate(row.date),
+      actualStart: row.actual_start || undefined,
+      actualEnd: row.actual_end || undefined,
+      approved: row.approved ?? false,
+    }));
+
+    setShifts((current) => [...current, ...inserted]);
   }
 
   async function clearSelectedDay() {
+    if (!isAdmin) {
+      alert("Only workspace admins can clear all shifts for a day.");
+      return;
+    }
+
     const ok = window.confirm(
       `Delete all shifts for ${selectedDayName} (${selectedDate})?`
     );
@@ -906,6 +1062,16 @@ async function handleLogout() {
   }
 
   async function setShiftApproval(id: string, approved: boolean) {
+    const target = shifts.find((s) => s.id === id);
+    if (!target) {
+      alert("Shift not found.");
+      return;
+    }
+    if (!isAdmin && target.employee !== (employeeName || "").trim()) {
+      alert("You can only change approval on your own shifts.");
+      return;
+    }
+
     const { data, error } = await supabase
       .from("shifts")
       .update({ approved })
@@ -938,6 +1104,11 @@ async function handleLogout() {
       return;
     }
 
+    if (!isAdmin && targetShift.employee !== (employeeName || "").trim()) {
+      alert("You can only approve your own shifts.");
+      return;
+    }
+
     try {
       await updateShiftActualTimes(
         shiftId,
@@ -951,6 +1122,11 @@ async function handleLogout() {
   }
 
   async function applyPlannedToAllSelectedDay() {
+    if (!isAdmin) {
+      alert("Only workspace admins can bulk-approve a day.");
+      return;
+    }
+
     const selectedDayShifts = shifts.filter((shift) => shift.date === selectedDate);
 
     if (selectedDayShifts.length === 0) {
@@ -1002,6 +1178,11 @@ async function handleLogout() {
   }
 
   async function updateEmployeeRate(name: string, newRate: number) {
+    if (!isAdmin) {
+      alert("Only workspace admins can change employee rates.");
+      return;
+    }
+
     const emp = employees.find((e: any) => e.name === name);
     if (!emp) return;
 
@@ -1026,6 +1207,11 @@ async function handleLogout() {
   }
 
   async function updateEmployeeRole(name: string, newRole: string) {
+    if (!isAdmin) {
+      alert("Only workspace admins can change employee roles.");
+      return;
+    }
+
     const emp = employees.find((e: any) => e.name === name);
     if (!emp) return;
 
@@ -1053,11 +1239,21 @@ async function handleLogout() {
     }
   }
 
-  function updateEmployeeName(oldName: string, newName: string) {
+  async function updateEmployeeName(oldName: string, newName: string) {
+    if (!isAdmin) {
+      alert("Only workspace admins can rename employees.");
+      return;
+    }
+
     const trimmed = newName.trim();
 
     if (!trimmed) {
       alert("Employee name cannot be empty.");
+      return;
+    }
+
+    if (!activeCompanyId) {
+      alert("No active company workspace found for this user.");
       return;
     }
 
@@ -1072,9 +1268,36 @@ async function handleLogout() {
       return;
     }
 
+    const employee = employees.find((item) => item.name === oldName);
+    if (!employee) return;
+
+    const { error: empError } = await supabase
+      .from("employees")
+      .update({ name: trimmed })
+      .eq("id", employee.id)
+      .eq("company_id", activeCompanyId);
+
+    if (empError) {
+      alert(empError.message);
+      return;
+    }
+
+    if (oldName !== trimmed) {
+      const { error: shiftError } = await supabase
+        .from("shifts")
+        .update({ employee: trimmed })
+        .eq("company_id", activeCompanyId)
+        .eq("employee", oldName);
+
+      if (shiftError) {
+        alert(shiftError.message);
+        return;
+      }
+    }
+
     setEmployees((current) =>
-      current.map((employee) =>
-        employee.name === oldName ? { ...employee, name: trimmed } : employee
+      current.map((emp) =>
+        emp.name === oldName ? { ...emp, name: trimmed } : emp
       )
     );
 
@@ -1097,7 +1320,12 @@ async function handleLogout() {
     }
   }
 
-  function setEmployeeActiveStatus(name: string, active: boolean) {
+  async function setEmployeeActiveStatus(name: string, active: boolean) {
+    if (!isAdmin) {
+      alert("Only workspace admins can change employee active status.");
+      return;
+    }
+
     const employee = employees.find((item) => item.name === name);
     if (!employee) return;
 
@@ -1124,12 +1352,33 @@ async function handleLogout() {
       }
     }
 
+    if (!activeCompanyId) {
+      alert("No active company workspace found for this user.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("employees")
+      .update({ active })
+      .eq("id", employee.id)
+      .eq("company_id", activeCompanyId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
     setEmployees((current) =>
       current.map((item) => (item.name === name ? { ...item, active } : item))
     );
   }
 
   async function deleteEmployee(name: string) {
+    if (!isAdmin) {
+      alert("Only workspace admins can delete employees.");
+      return;
+    }
+
     const employee = employees.find((item: any) => item.name === name);
     if (!employee) return;
 
@@ -1213,7 +1462,12 @@ async function handleLogout() {
     }));
   }
 
-  function addUnavailableDate(name: string) {
+  async function addUnavailableDate(name: string) {
+    if (!isAdmin) {
+      alert("Only workspace admins can manage employee availability here.");
+      return;
+    }
+
     const dateToAdd = availabilityDrafts[name];
 
     if (!dateToAdd) {
@@ -1221,16 +1475,39 @@ async function handleLogout() {
       return;
     }
 
-    setEmployees((current) =>
-      current.map((employee) => {
-        if (employee.name !== name) return employee;
-        if (employee.unavailableDates.includes(dateToAdd)) return employee;
+    if (!activeCompanyId) {
+      alert("No active company workspace found for this user.");
+      return;
+    }
 
-        return {
-          ...employee,
-          unavailableDates: [...employee.unavailableDates, dateToAdd].sort(),
-        };
-      })
+    const employee = employees.find((item) => item.name === name);
+    if (!employee) return;
+
+    if (employee.unavailableDates.includes(dateToAdd)) {
+      setAvailabilityDrafts((current) => ({
+        ...current,
+        [name]: "",
+      }));
+      return;
+    }
+
+    const nextDates = [...employee.unavailableDates, dateToAdd].sort();
+
+    const { error } = await supabase
+      .from("employees")
+      .update({ unavailable_dates: nextDates })
+      .eq("id", employee.id)
+      .eq("company_id", activeCompanyId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setEmployees((current) =>
+      current.map((emp) =>
+        emp.name === name ? { ...emp, unavailableDates: nextDates } : emp
+      )
     );
 
     setAvailabilityDrafts((current) => ({
@@ -1239,17 +1516,36 @@ async function handleLogout() {
     }));
   }
 
-  function removeUnavailableDate(name: string, dateToRemove: string) {
+  async function removeUnavailableDate(name: string, dateToRemove: string) {
+    if (!isAdmin) {
+      alert("Only workspace admins can manage employee availability here.");
+      return;
+    }
+
+    if (!activeCompanyId) {
+      alert("No active company workspace found for this user.");
+      return;
+    }
+
+    const employee = employees.find((item) => item.name === name);
+    if (!employee) return;
+
+    const nextDates = employee.unavailableDates.filter((date) => date !== dateToRemove);
+
+    const { error } = await supabase
+      .from("employees")
+      .update({ unavailable_dates: nextDates })
+      .eq("id", employee.id)
+      .eq("company_id", activeCompanyId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
     setEmployees((current) =>
-      current.map((employee) =>
-        employee.name === name
-          ? {
-              ...employee,
-              unavailableDates: employee.unavailableDates.filter(
-                (date) => date !== dateToRemove
-              ),
-            }
-          : employee
+      current.map((emp) =>
+        emp.name === name ? { ...emp, unavailableDates: nextDates } : emp
       )
     );
   }
@@ -1259,6 +1555,10 @@ async function handleLogout() {
     hourlyRate?: number;
     defaultRole?: string;
   }) {
+    if (!isAdmin) {
+      throw new Error("Only workspace admins can add employees.");
+    }
+
     const trimmedName = (overrides?.name ?? newEmployeeForm.name).trim();
     const hourlyRate = Number(overrides?.hourlyRate ?? newEmployeeForm.hourlyRate);
     const trimmedRole =
@@ -1339,6 +1639,16 @@ async function handleLogout() {
   }
 
   async function punchIn(id: string) {
+    const target = shifts.find((s) => s.id === id);
+    if (!target) {
+      alert("Shift not found.");
+      return;
+    }
+    if (!isAdmin && target.employee !== (employeeName || "").trim()) {
+      alert("You can only punch in on your own shifts.");
+      return;
+    }
+
     const now = getCurrentTimeString();
     const rounded = roundTime(now);
 
@@ -1373,6 +1683,15 @@ async function handleLogout() {
     const now = getCurrentTimeString();
     const targetShift = shifts.find((shift) => shift.id === id);
     const roundedNow = roundTime(now);
+
+    if (!targetShift) {
+      alert("Shift not found.");
+      return;
+    }
+    if (!isAdmin && targetShift.employee !== (employeeName || "").trim()) {
+      alert("You can only punch out on your own shifts.");
+      return;
+    }
 
     if (!targetShift?.actualStart) {
       alert("Please punch in first.");
@@ -1411,6 +1730,14 @@ async function handleLogout() {
     actualStart: string | null,
     actualEnd: string | null
   ) {
+    const target = shifts.find((s) => s.id === id);
+    if (!target) {
+      throw new Error("Shift not found.");
+    }
+    if (!isAdmin && target.employee !== (employeeName || "").trim()) {
+      throw new Error("You can only edit actual times on your own shifts.");
+    }
+
     const { data, error } = await supabase
       .from("shifts")
       .update({
@@ -1444,6 +1771,16 @@ async function handleLogout() {
   }
 
   async function resetPunch(id: string) {
+    const target = shifts.find((s) => s.id === id);
+    if (!target) {
+      alert("Shift not found.");
+      return;
+    }
+    if (!isAdmin && target.employee !== (employeeName || "").trim()) {
+      alert("You can only reset punch data on your own shifts.");
+      return;
+    }
+
     try {
       await updateShiftActualTimes(id, null, null);
     } catch (error: any) {
@@ -2119,57 +2456,35 @@ async function handleLogout() {
           <option key={role} value={role} />
         ))}
       </datalist>
-      <header className="sticky top-0 z-40 flex h-14 w-full shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-[0_1px_0_rgba(15,23,42,0.06)] xl:px-6 2xl:px-8">
-          <span className="text-lg font-semibold tracking-tight text-indigo-950">
-            Planyo
-          </span>
-          <div className="relative" ref={userMenuRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setIsUserMenuOpen((current) => !current);
-                setIsHomeMenuOpen(false);
-                setIsScheduleMenuOpen(false);
-                setIsPeopleMenuOpen(false);
-                setIsPayrollMenuOpen(false);
-                setIsSettingsMenuOpen(false);
-              }}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition md:px-3 ${
-                isUserMenuOpen
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-700 hover:bg-slate-100"
-              }`}
-            >
-              {navUserLabel}
-              <span className="text-xs opacity-70">▾</span>
-            </button>
-            {isUserMenuOpen ? (
-              <div className="absolute right-0 z-40 mt-1.5 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => openUserMenuRoute("/profile")}
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
-                >
-                  Profile
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openUserMenuRoute("/account")}
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
-                >
-                  Account
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-600 transition hover:bg-slate-50"
-                >
-                  Log out
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </header>
+      <WorkspaceAppNav
+        isAdmin={isAdmin}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        navUserLabel={navUserLabel}
+        isHomeMenuOpen={isHomeMenuOpen}
+        isScheduleMenuOpen={isScheduleMenuOpen}
+        isPeopleMenuOpen={isPeopleMenuOpen}
+        isPayrollMenuOpen={isPayrollMenuOpen}
+        isSettingsMenuOpen={isSettingsMenuOpen}
+        isUserMenuOpen={isUserMenuOpen}
+        onToggleHomeMenu={toggleHomeMenu}
+        onToggleScheduleMenu={toggleScheduleMenu}
+        onTogglePeopleMenu={togglePeopleMenu}
+        onTogglePayrollMenu={togglePayrollMenu}
+        onToggleSettingsMenu={toggleSettingsMenu}
+        onToggleUserMenu={toggleUserMenu}
+        closeAllNavMenus={closeAllNavMenus}
+        openHomeMenuTab={openHomeMenuTab}
+        openHomeMenuRoute={openHomeMenuRoute}
+        openScheduleMenuTab={openScheduleMenuTab}
+        openScheduleMenuRoute={openScheduleMenuRoute}
+        openPeopleMenuTab={openPeopleMenuTab}
+        openPayrollMenuTab={openPayrollMenuTab}
+        openPayrollMenuRoute={openPayrollMenuRoute}
+        openSettingsMenuRoute={openSettingsMenuRoute}
+        openUserMenuRoute={openUserMenuRoute}
+        onLogout={handleLogout}
+      />
 
         <div className="flex w-full flex-1 flex-col px-4 pb-10 pt-4 xl:px-6 2xl:px-8">
         {/* B + C — dashboard hero + actions/stats (home only) */}
@@ -2367,351 +2682,6 @@ async function handleLogout() {
             </div>
           </div>
         ) : null}
-
-        {/* TOP NAVIGATION */}
-        <nav
-          aria-label="Main"
-          className="-mx-4 mb-5 flex flex-wrap items-end gap-1 border-b border-slate-200 bg-white px-4 pb-0 pt-1 shadow-sm xl:-mx-6 xl:px-6 2xl:-mx-8 2xl:px-8"
-        >
-            <div className="relative" ref={homeMenuRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setIsHomeMenuOpen((current) => !current);
-                setIsScheduleMenuOpen(false);
-                setIsPeopleMenuOpen(false);
-                setIsPayrollMenuOpen(false);
-                setIsSettingsMenuOpen(false);
-                setIsUserMenuOpen(false);
-              }}
-              className={`inline-flex h-9 items-center gap-1 rounded-md border-b-2 px-3 text-sm font-medium transition ${
-                activeTab === "home" || isHomeMenuOpen
-                  ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
-                  : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              Home <span className="text-[10px] opacity-70">▾</span>
-            </button>
-            {isHomeMenuOpen ? (
-              <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                <button
-                  type="button"
-                  onClick={() => openHomeMenuTab("home")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Home
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openHomeMenuTab("schedule")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Your schedule
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openHomeMenuRoute("/your-availability")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Your availability
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openHomeMenuRoute("/your-leave-overview")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Your leave overview
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openHomeMenuRoute("/payslips")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Payslips
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openHomeMenuRoute("/news")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  News
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openHomeMenuRoute("/events")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Events
-                </button>
-              </div>
-            ) : null}
-          </div>
-          <div className="relative" ref={scheduleMenuRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setIsScheduleMenuOpen((current) => !current);
-                setIsHomeMenuOpen(false);
-                setIsPeopleMenuOpen(false);
-                setIsPayrollMenuOpen(false);
-                setIsSettingsMenuOpen(false);
-                setIsUserMenuOpen(false);
-              }}
-              className={`inline-flex h-9 items-center gap-1 rounded-md border-b-2 px-3 text-sm font-medium transition ${
-                activeTab === "schedule" || isScheduleMenuOpen
-                  ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
-                  : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              Schedule <span className="text-[10px] opacity-70">▾</span>
-            </button>
-            {isScheduleMenuOpen ? (
-              <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                <button
-                  type="button"
-                  onClick={() => openScheduleMenuTab("schedule")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Schedule
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openScheduleMenuRoute("/pending-requests")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Pending requests
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openScheduleMenuRoute("/punch-clock")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Punch Clock
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openScheduleMenuRoute("/availability")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Availability
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openScheduleMenuRoute("/leave-requests")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Leave requests
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openScheduleMenuRoute("/contracted-hours")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Contracted hours
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openScheduleMenuRoute("/leave-accounts")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Leave accounts
-                </button>
-              </div>
-            ) : null}
-          </div>
-          {isAdmin ? (
-            <div className="relative" ref={peopleMenuRef}>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsPeopleMenuOpen((current) => !current);
-                  setIsHomeMenuOpen(false);
-                  setIsScheduleMenuOpen(false);
-                  setIsPayrollMenuOpen(false);
-                  setIsSettingsMenuOpen(false);
-                  setIsUserMenuOpen(false);
-                }}
-                className={`inline-flex h-9 items-center gap-1 rounded-md border-b-2 px-3 text-sm font-medium transition ${
-                  activeTab === "employees" || isPeopleMenuOpen
-                    ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
-                    : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                People <span className="text-[10px] opacity-70">▾</span>
-              </button>
-              <div
-                className={`absolute left-0 z-30 mt-2 w-60 origin-top rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_14px_34px_rgba(15,23,42,0.16)] transition duration-150 ${
-                  isPeopleMenuOpen
-                    ? "pointer-events-auto translate-y-0 opacity-100"
-                    : "pointer-events-none -translate-y-1 opacity-0"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => openPeopleMenuTab("employees")}
-                  className={`flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                    activeTab === "employees"
-                      ? "bg-slate-100 font-semibold text-slate-900"
-                      : "font-medium text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="text-slate-400">👤</span>
-                  <span>Employees</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  <span className="text-slate-400">👥</span>
-                  <span>Employee groups</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  <span className="text-slate-400">🏢</span>
-                  <span>Departments</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  <span className="text-slate-400">📄</span>
-                  <span>Contracts</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  <span className="text-slate-400">📁</span>
-                  <span>Documents</span>
-                </button>
-              </div>
-            </div>
-          ) : null}
-          {isAdmin ? (
-            <div className="relative" ref={payrollMenuRef}>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsPayrollMenuOpen((current) => !current);
-                  setIsHomeMenuOpen(false);
-                  setIsScheduleMenuOpen(false);
-                  setIsPeopleMenuOpen(false);
-                  setIsSettingsMenuOpen(false);
-                  setIsUserMenuOpen(false);
-                }}
-                className={`inline-flex h-9 items-center gap-1 rounded-md border-b-2 px-3 text-sm font-medium transition ${
-                  activeTab === "payroll" || isPayrollMenuOpen
-                    ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
-                    : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                Payroll <span className="text-[10px] opacity-70">▾</span>
-              </button>
-              {isPayrollMenuOpen ? (
-                <div className="absolute left-0 z-30 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                  <button
-                    type="button"
-                    onClick={() => openPayrollMenuTab("payroll")}
-                    className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Payroll report
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openPayrollMenuRoute("/payroll/lock-date-range")}
-                    className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Lock date range for payroll
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openPayrollMenuRoute("/payroll/import-payslips")}
-                    className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Import payslips
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="relative" ref={settingsMenuRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setIsSettingsMenuOpen((current) => !current);
-                setIsHomeMenuOpen(false);
-                setIsScheduleMenuOpen(false);
-                setIsPeopleMenuOpen(false);
-                setIsPayrollMenuOpen(false);
-                setIsUserMenuOpen(false);
-              }}
-              className={`inline-flex h-9 items-center gap-1 rounded-md border-b-2 px-3 text-sm font-medium transition ${
-                isSettingsMenuOpen
-                  ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
-                  : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              Settings <span className="text-[10px] opacity-70">▾</span>
-            </button>
-            {isSettingsMenuOpen ? (
-              <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                <button
-                  type="button"
-                  onClick={() => openSettingsMenuRoute("/settings/workspace")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Workspace settings
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openSettingsMenuRoute("/settings/company")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Company details
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openSettingsMenuRoute("/settings/roles")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Roles & permissions
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openSettingsMenuRoute("/settings/notifications")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Notifications
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openSettingsMenuRoute("/settings/integrations")}
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Integrations
-                </button>
-              </div>
-            ) : null}
-          </div>
-          {[
-  { key: "week", label: "Week View" },
-  { key: "month", label: "Month View" },
-].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as AppTab)}
-              className={`inline-flex h-9 items-center rounded-md border-b-2 px-3 text-sm font-medium transition ${
-                activeTab === tab.key
-                  ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
-                  : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
 
         {activeTab === "home" && (
           <HomeDashboardSection
