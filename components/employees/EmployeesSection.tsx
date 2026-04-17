@@ -1,6 +1,463 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+const inputClass =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-100";
+
+const labelClass = "mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500";
+
+function splitEmployeeDisplayName(full: string) {
+  const t = full.trim();
+  if (!t) return { firstName: "", surname: "" };
+  const parts = t.split(/\s+/);
+  return { firstName: parts[0] ?? "", surname: parts.slice(1).join(" ") };
+}
+
+function initialsFromName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+}
+
+function SectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4">
+        <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+        {description ? (
+          <p className="mt-1 text-xs text-slate-500">{description}</p>
+        ) : null}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+type EmployeeEditPanelProps = {
+  employee: {
+    name: string;
+    hourlyRate: number;
+    defaultRole: string;
+    unavailableDates: string[];
+    active: boolean;
+  };
+  updateEmployeeName: (oldName: string, newName: string) => void;
+  updateEmployeeRate: (name: string, newRate: number) => Promise<void>;
+  updateEmployeeRole: (name: string, newRole: string) => Promise<void>;
+  setEmployeeActiveStatus: (name: string, active: boolean) => void;
+  deleteEmployee: (name: string) => Promise<void>;
+  availabilityDrafts: Record<string, string>;
+  updateAvailabilityDraft: (name: string, value: string) => void;
+  addUnavailableDate: (name: string) => void;
+  removeUnavailableDate: (name: string, date: string) => void;
+};
+
+function EmployeeEditPanel({
+  employee,
+  updateEmployeeName,
+  updateEmployeeRate,
+  updateEmployeeRole,
+  setEmployeeActiveStatus,
+  deleteEmployee,
+  availabilityDrafts,
+  updateAvailabilityDraft,
+  addUnavailableDate,
+  removeUnavailableDate,
+}: EmployeeEditPanelProps) {
+  const parsed = useMemo(() => splitEmployeeDisplayName(employee.name), [employee.name]);
+
+  const [firstName, setFirstName] = useState(parsed.firstName);
+  const [surname, setSurname] = useState(parsed.surname);
+  const [hourlyRate, setHourlyRate] = useState(String(employee.hourlyRate));
+  const [defaultRole, setDefaultRole] = useState(employee.defaultRole);
+  const [emailDraft, setEmailDraft] = useState("");
+  const [phoneDraft, setPhoneDraft] = useState("");
+  const [birthday, setBirthday] = useState("");
+  const [gender, setGender] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [city, setCity] = useState("");
+  const [postcode, setPostcode] = useState("");
+  const [country, setCountry] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [payrollPin, setPayrollPin] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const next = splitEmployeeDisplayName(employee.name);
+    setFirstName(next.firstName);
+    setSurname(next.surname);
+    setHourlyRate(String(employee.hourlyRate));
+    setDefaultRole(employee.defaultRole);
+  }, [employee.name, employee.hourlyRate, employee.defaultRole]);
+
+  const displayName = useMemo(
+    () => [firstName, surname].filter(Boolean).join(" ").trim() || employee.name,
+    [firstName, surname, employee.name]
+  );
+
+  const resetDraft = useCallback(() => {
+    const next = splitEmployeeDisplayName(employee.name);
+    setFirstName(next.firstName);
+    setSurname(next.surname);
+    setHourlyRate(String(employee.hourlyRate));
+    setDefaultRole(employee.defaultRole);
+    setEmailDraft("");
+    setPhoneDraft("");
+    setBirthday("");
+    setGender("");
+    setAddressLine("");
+    setCity("");
+    setPostcode("");
+    setCountry("");
+    setBankAccount("");
+    setTaxId("");
+    setPayrollPin("");
+  }, [employee.defaultRole, employee.hourlyRate, employee.name]);
+
+  const handleSave = async () => {
+    const fullName = [firstName, surname].filter(Boolean).join(" ").trim();
+    if (!fullName) {
+      window.alert("Please enter at least a first name or surname.");
+      return;
+    }
+    const rate = Number(hourlyRate);
+    if (Number.isNaN(rate) || rate < 0) {
+      window.alert("Please enter a valid hourly rate.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateEmployeeRate(employee.name, rate);
+      await updateEmployeeRole(employee.name, defaultRole.trim());
+      if (fullName !== employee.name.trim()) {
+        updateEmployeeName(employee.name, fullName);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setEmployeeActiveStatus(employee.name, true)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              employee.active
+                ? "bg-slate-900 text-white"
+                : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            onClick={() => setEmployeeActiveStatus(employee.name, false)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              !employee.active
+                ? "bg-slate-900 text-white"
+                : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            Inactive
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => void deleteEmployee(employee.name)}
+          className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-100 transition hover:bg-red-100"
+        >
+          Delete employee
+        </button>
+      </div>
+
+      <div className="grid gap-6 p-5 md:p-6 lg:grid-cols-12 lg:gap-8">
+        <aside className="lg:col-span-4">
+          <div className="rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">
+                {initialsFromName(displayName)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-lg font-semibold text-slate-900">{displayName}</p>
+                <p className="mt-1 truncate text-sm text-slate-500">
+                  {emailDraft.trim() ? emailDraft.trim() : "No email on file"}
+                </p>
+                <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+                  Role
+                </p>
+                <p className="mt-0.5 truncate text-sm font-medium text-slate-800">{defaultRole || "—"}</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <div className="space-y-6 lg:col-span-8">
+          <SectionCard
+            title="Personal info"
+            description="Name and role are saved with Save. Other fields are UI-only until backend support is added."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>First name</label>
+                <input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className={inputClass}
+                  placeholder="First name"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Surname</label>
+                <input
+                  value={surname}
+                  onChange={(e) => setSurname(e.target.value)}
+                  className={inputClass}
+                  placeholder="Surname"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Birthday</label>
+                <input
+                  type="date"
+                  value={birthday}
+                  onChange={(e) => setBirthday(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Gender</label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Prefer not to say</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                  <option value="non-binary">Non-binary</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Contact info"
+            description="Not stored in Planyo yet — captured for future sync."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Email</label>
+                <input
+                  type="email"
+                  value={emailDraft}
+                  onChange={(e) => setEmailDraft(e.target.value)}
+                  className={inputClass}
+                  placeholder="name@company.com"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Phone</label>
+                <input
+                  value={phoneDraft}
+                  onChange={(e) => setPhoneDraft(e.target.value)}
+                  className={inputClass}
+                  placeholder="+45 12 34 56 78"
+                />
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Address"
+            description="Not stored in Planyo yet — captured for future sync."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Street address</label>
+                <input
+                  value={addressLine}
+                  onChange={(e) => setAddressLine(e.target.value)}
+                  className={inputClass}
+                  placeholder="Street and number"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>City</label>
+                <input
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className={inputClass}
+                  placeholder="City"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Postcode</label>
+                <input
+                  value={postcode}
+                  onChange={(e) => setPostcode(e.target.value)}
+                  className={inputClass}
+                  placeholder="Postcode"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Country</label>
+                <input
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className={inputClass}
+                  placeholder="Country"
+                />
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Payroll & scheduling">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>Hourly rate (DKK)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={hourlyRate}
+                  onChange={(e) => setHourlyRate(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Default role</label>
+                <input
+                  value={defaultRole}
+                  onChange={(e) => setDefaultRole(e.target.value)}
+                  className={inputClass}
+                  placeholder="Role"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Bank account</label>
+                <input
+                  value={bankAccount}
+                  onChange={(e) => setBankAccount(e.target.value)}
+                  className={inputClass}
+                  placeholder="IBAN or account no."
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Tax ID</label>
+                <input
+                  value={taxId}
+                  onChange={(e) => setTaxId(e.target.value)}
+                  className={inputClass}
+                  placeholder="CPR / tax number"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelClass}>PIN / reference</label>
+                <input
+                  value={payrollPin}
+                  onChange={(e) => setPayrollPin(e.target.value)}
+                  className={inputClass}
+                  placeholder="Internal reference"
+                />
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-slate-400">
+              Bank, tax ID, and PIN are not saved yet. Hourly rate and default role are saved with Save.
+            </p>
+          </SectionCard>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between md:px-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-900"
+          >
+            Back
+          </Link>
+          <button
+            type="button"
+            onClick={resetDraft}
+            disabled={isSaving}
+            className="inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-white hover:text-slate-800 disabled:opacity-50"
+          >
+            Reset changes
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={isSaving}
+          className="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60 sm:w-auto"
+        >
+          {isSaving ? "Saving…" : "Save"}
+        </button>
+      </div>
+
+      <div className="border-t border-slate-100 p-5 md:p-6">
+        <h4 className="text-sm font-semibold text-slate-900">Availability</h4>
+        <p className="mt-1 text-xs text-slate-500">
+          Unavailable dates apply immediately when you add or remove.
+        </p>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+          <input
+            type="date"
+            value={availabilityDrafts[employee.name] || ""}
+            onChange={(e) => updateAvailabilityDraft(employee.name, e.target.value)}
+            className={inputClass}
+          />
+          <button
+            type="button"
+            onClick={() => addUnavailableDate(employee.name)}
+            className="shrink-0 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+          >
+            Add date
+          </button>
+        </div>
+        {employee.unavailableDates.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">No unavailable dates.</p>
+        ) : (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {employee.unavailableDates.map((date: string) => (
+              <span
+                key={date}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700"
+              >
+                {date}
+                <button
+                  type="button"
+                  onClick={() => removeUnavailableDate(employee.name, date)}
+                  className="rounded-full px-1.5 text-red-600 hover:bg-red-50"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
 
 export default function EmployeesSection({
   sortedEmployeesData,
@@ -410,157 +867,21 @@ export default function EmployeesSection({
         </div>
       )}
 
-      <div className="grid gap-4">
+      <div className="flex flex-col gap-8">
         {sortedEmployeesData.map((employee: any) => (
-          <div
+          <EmployeeEditPanel
             key={employee.name}
-            className="rounded-3xl border border-slate-200 bg-slate-50 p-5"
-          >
-            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h3 className="text-lg font-bold">{employee.name}</h3>
-                <p className="text-sm text-slate-500">
-                  {employee.active ? "Active employee" : "Inactive employee"}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setEmployeeActiveStatus(employee.name, true)}
-                  className={`rounded-2xl px-4 py-2 text-sm font-semibold ${
-                    employee.active
-                      ? "bg-slate-900 text-white"
-                      : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  Active
-                </button>
-
-                <button
-                  onClick={() => setEmployeeActiveStatus(employee.name, false)}
-                  className={`rounded-2xl px-4 py-2 text-sm font-semibold ${
-                    !employee.active
-                      ? "bg-slate-900 text-white"
-                      : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  Inactive
-                </button>
-
-                <button
-                  onClick={() => deleteEmployee(employee.name)}
-                  className="rounded-2xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium">Name</label>
-                <input
-                  defaultValue={employee.name}
-                  onBlur={(e) => updateEmployeeName(employee.name, e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Hourly Rate (DKK)
-                </label>
-                <input
-                  type="number"
-                  value={employee.hourlyRate}
-                  onChange={(e) =>
-                    updateEmployeeRate(employee.name, Number(e.target.value))
-                  }
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Default Role
-                </label>
-                <input
-                  value={employee.defaultRole}
-                  onChange={(e) =>
-                    updateEmployeeRole(employee.name, e.target.value)
-                  }
-                  placeholder="Write or choose role"
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                />
-              </div>
-
-              <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
-                <p className="text-sm text-slate-500">Summary</p>
-                <p className="mt-2 text-sm text-slate-700">
-                  <span className="font-semibold">Status:</span>{" "}
-                  {employee.active ? "Active" : "Inactive"}
-                </p>
-                <p className="mt-1 text-sm text-slate-700">
-                  <span className="font-semibold">Unavailable:</span>{" "}
-                  {employee.unavailableDates.length}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-              <label className="mb-2 block text-sm font-medium">
-                Add Unavailable Date
-              </label>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  type="date"
-                  value={availabilityDrafts[employee.name] || ""}
-                  onChange={(e) =>
-                    updateAvailabilityDraft(employee.name, e.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                />
-                <button
-                  onClick={() => addUnavailableDate(employee.name)}
-                  className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-amber-600"
-                >
-                  Add
-                </button>
-              </div>
-
-              <div className="mt-3">
-                <p className="text-sm font-medium text-slate-700">
-                  Unavailable Dates
-                </p>
-
-                {employee.unavailableDates.length === 0 ? (
-                  <p className="mt-2 text-sm text-slate-500">
-                    No unavailable dates added.
-                  </p>
-                ) : (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {employee.unavailableDates.map((date: string) => (
-                      <div
-                        key={date}
-                        className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-amber-800"
-                      >
-                        <span>{date}</span>
-                        <button
-                          onClick={() =>
-                            removeUnavailableDate(employee.name, date)
-                          }
-                          className="rounded-full bg-white px-2 py-0.5 text-[11px] text-red-600 hover:bg-red-50"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+            employee={employee}
+            updateEmployeeName={updateEmployeeName}
+            updateEmployeeRate={updateEmployeeRate}
+            updateEmployeeRole={updateEmployeeRole}
+            setEmployeeActiveStatus={setEmployeeActiveStatus}
+            deleteEmployee={deleteEmployee}
+            availabilityDrafts={availabilityDrafts}
+            updateAvailabilityDraft={updateAvailabilityDraft}
+            addUnavailableDate={addUnavailableDate}
+            removeUnavailableDate={removeUnavailableDate}
+          />
         ))}
       </div>
     </section>

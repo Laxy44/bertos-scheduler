@@ -16,7 +16,7 @@ const ShiftMiniCard = ({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-2xl border px-3 py-2 text-left shadow-sm transition ${
+      className={`w-full rounded-lg border px-2.5 py-1.5 text-left text-sm shadow-sm transition ${
         disabled ? "cursor-default" : "hover:border-slate-300"
       } ${
         isApproved
@@ -241,11 +241,18 @@ export default function ScheduleSection({
     return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
   };
 
+  const gridTemplate =
+    "grid grid-cols-[minmax(14rem,17rem)_repeat(7,minmax(7.75rem,1fr))]";
+
   return (
-    <section className="space-y-4 rounded-3xl bg-white p-5 shadow-sm">
-      <div className="sticky top-16 z-40 rounded-2xl border border-slate-200 bg-slate-50/95 p-4 shadow-sm backdrop-blur">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap items-center gap-2" ref={toolbarMenuRef}>
+    <section className="w-full space-y-4">
+      <div className="sticky top-14 z-30 w-full border-b border-slate-200 bg-white shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+        <div className="flex flex-col gap-0">
+          <div
+            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2.5 sm:px-4"
+            ref={toolbarMenuRef}
+          >
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
             <div className="relative">
               <button
                 type="button"
@@ -254,10 +261,10 @@ export default function ScheduleSection({
                 }
                 aria-haspopup="menu"
                 aria-expanded={openToolbarMenu === "view"}
-                className={`inline-flex min-w-[132px] items-center justify-between rounded-xl border px-3 py-2 text-sm font-semibold transition active:scale-[0.99] ${
+                className={`inline-flex min-w-[7.5rem] items-center justify-between rounded-md border px-2.5 py-1.5 text-sm font-semibold transition active:scale-[0.99] ${
                   openToolbarMenu === "view"
-                    ? "border-slate-300 bg-slate-100 text-slate-900"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                    ? "border-slate-300 bg-slate-50 text-slate-900"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 <span>{selectedViewLabel}</span>
@@ -306,19 +313,35 @@ export default function ScheduleSection({
                 })}
               </div>
             </div>
-            <button type="button" onClick={goToday} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 active:scale-[0.99]">
+            <button
+              type="button"
+              onClick={goToday}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 active:scale-[0.99]"
+            >
               Today
             </button>
-            <button type="button" onClick={goPrev} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 active:scale-[0.99]">←</button>
-            <button type="button" onClick={goNext} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 active:scale-[0.99]">→</button>
-            <div className="ml-1 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">
+            <button
+              type="button"
+              onClick={goPrev}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 active:scale-[0.99]"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              onClick={goNext}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 active:scale-[0.99]"
+            >
+              →
+            </button>
+            <div className="ml-0.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-slate-800 sm:text-sm">
               {weekRangeLabel}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2">
             <button
               type="button"
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 active:scale-[0.99]"
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.99]"
             >
               View settings
             </button>
@@ -333,10 +356,10 @@ export default function ScheduleSection({
                 }
                 aria-haspopup="menu"
                 aria-expanded={openToolbarMenu === "templates"}
-                className={`inline-flex min-w-[136px] items-center justify-between rounded-xl border px-3 py-2 text-sm font-medium transition active:scale-[0.99] ${
+                className={`inline-flex min-w-[6.5rem] items-center justify-between rounded-md border px-2.5 py-1.5 text-sm font-medium shadow-sm transition active:scale-[0.99] sm:min-w-[7.5rem] ${
                   openToolbarMenu === "templates"
-                    ? "border-slate-300 bg-slate-100 text-slate-900"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                    ? "border-slate-300 bg-slate-50 text-slate-900"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 Templates
@@ -392,10 +415,10 @@ export default function ScheduleSection({
                 }
                 aria-haspopup="menu"
                 aria-expanded={openToolbarMenu === "tools"}
-                className={`inline-flex min-w-[124px] items-center justify-between rounded-xl border px-3 py-2 text-sm font-medium transition active:scale-[0.99] ${
+                className={`inline-flex min-w-[6rem] items-center justify-between rounded-md border px-2.5 py-1.5 text-sm font-medium shadow-sm transition active:scale-[0.99] sm:min-w-[6.75rem] ${
                   openToolbarMenu === "tools"
-                    ? "border-slate-300 bg-slate-100 text-slate-900"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                    ? "border-slate-300 bg-slate-50 text-slate-900"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 Tools
@@ -453,10 +476,10 @@ export default function ScheduleSection({
                 }
                 aria-haspopup="menu"
                 aria-expanded={openToolbarMenu === "filters"}
-                className={`inline-flex min-w-[130px] items-center justify-between rounded-xl border px-3 py-2 text-sm font-medium transition active:scale-[0.99] ${
+                className={`inline-flex min-w-[6.25rem] items-center justify-between rounded-md border px-2.5 py-1.5 text-sm font-medium shadow-sm transition active:scale-[0.99] sm:min-w-[7rem] ${
                   openToolbarMenu === "filters"
-                    ? "border-slate-300 bg-slate-100 text-slate-900"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                    ? "border-slate-300 bg-slate-50 text-slate-900"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 Filters
@@ -504,50 +527,86 @@ export default function ScheduleSection({
               </div>
             </div>
 
-            <button type="button" className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.99]">
+            <button
+              type="button"
+              className="rounded-md bg-indigo-600 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.99] sm:px-4"
+            >
               Publish shifts
             </button>
           </div>
-        </div>
-      </div>
-
-      <div className="sticky top-[8.25rem] z-30 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="rounded-xl bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white shadow-sm">Employees</button>
-            <button type="button" className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">Groups</button>
-            <button type="button" className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">Positions</button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={onAddEmployeeCta} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
-              Manage Employees
-            </button>
-            <select
-              value={employeeFilter}
-              onChange={(e) => setEmployeeFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-300"
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-slate-100 bg-slate-50/50 px-3 py-2 sm:px-4">
+            <div
+              className="inline-flex rounded-md border border-slate-200 bg-slate-100/90 p-0.5 shadow-inner"
+              role="tablist"
+              aria-label="Schedule rows"
             >
-              <option value="All">All employees</option>
-              {employeeNames.map((name: string) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <button type="button" className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
-              Sort by
-            </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={true}
+                className="rounded-[0.3125rem] bg-white px-2.5 py-1 text-xs font-semibold text-indigo-950 shadow-sm ring-1 ring-slate-200/70 sm:text-sm"
+              >
+                Employees
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={false}
+                className="rounded-[0.3125rem] px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-white/70 sm:text-sm"
+              >
+                Groups
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={false}
+                className="rounded-[0.3125rem] px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-white/70 sm:text-sm"
+              >
+                Positions
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={onAddEmployeeCta}
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Manage Employees
+              </button>
+              <select
+                value={employeeFilter}
+                onChange={(e) => setEmployeeFilter(e.target.value)}
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-indigo-300 focus:ring-1 focus:ring-indigo-200"
+              >
+                <option value="All">All employees</option>
+                {employeeNames.map((name: string) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Sort by
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-        <div className="max-h-[68vh] overflow-auto">
-          <div className="min-w-[1160px]">
-            <div className="sticky top-0 z-20 grid grid-cols-[260px_repeat(7,minmax(120px,1fr))] border-b border-slate-200 bg-slate-50 shadow-[0_1px_0_0_rgba(15,23,42,0.06)]">
-              <div className="sticky left-0 z-30 border-r border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Employee rail</p>
-                <p className="mt-1 text-sm font-semibold text-slate-700">Open shifts and team rows</p>
+      <div className="w-full overflow-hidden rounded-lg border border-slate-300/80 bg-white shadow-sm">
+        <div className="max-h-[76vh] w-full overflow-auto">
+          <div className="min-w-[1020px]">
+            <div
+              className={`sticky top-0 z-20 ${gridTemplate} border-b-2 border-slate-200 bg-slate-100 shadow-[0_1px_0_0_rgba(15,23,42,0.06)]`}
+            >
+              <div className="sticky left-0 z-30 border-r-2 border-slate-200 bg-slate-100 px-3 py-3 shadow-[inset_-1px_0_0_rgba(15,23,42,0.04)] sm:px-4 sm:py-3.5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Schedule</p>
+                <p className="mt-0.5 text-sm font-semibold leading-tight text-slate-900">People & open shifts</p>
+                <p className="mt-1 text-[11px] leading-snug text-slate-500">Rail stays fixed while you scroll dates.</p>
               </div>
               {weekDates.map((item: any) => {
                 const dateObj = new Date(item.date);
@@ -562,26 +621,36 @@ export default function ScheduleSection({
                       setForm((current: any) => ({ ...current, date: item.date }));
                       setOpenMenuId(null);
                     }}
-                    className={`border-r border-slate-200 p-4 text-left transition last:border-r-0 ${
+                    className={`border-r border-slate-200 px-3 py-3 text-left transition last:border-r-0 sm:px-4 sm:py-3.5 ${
                       isSelected
-                        ? "bg-slate-900 text-white"
+                        ? "bg-indigo-600 text-white shadow-[inset_0_-3px_0_rgba(255,255,255,0.12)]"
                         : isToday
-                        ? "bg-blue-50 text-slate-900"
-                        : "bg-slate-50 hover:bg-slate-100"
+                        ? "bg-sky-50 text-slate-900 ring-1 ring-inset ring-sky-200/90 hover:bg-sky-100/80"
+                        : "bg-white text-slate-800 hover:bg-slate-50"
                     }`}
                   >
-                    <div className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${isSelected ? "text-white/70" : "text-slate-400"}`}>
+                    <div
+                      className={`text-[10px] font-bold uppercase tracking-[0.18em] ${
+                        isSelected ? "text-indigo-100" : "text-slate-500"
+                      }`}
+                    >
                       {item.dayName.slice(0, 3)}
                     </div>
-                    <div className="mt-1 text-sm font-bold">{String(dateObj.getDate()).padStart(2, "0")}</div>
+                    <div className="mt-1 text-base font-bold tabular-nums">
+                      {String(dateObj.getDate()).padStart(2, "0")}
+                    </div>
                     <div
-                      className={`mt-1 text-xs ${
-                        isSelected ? "text-white/80" : isToday ? "text-blue-700" : "text-slate-500"
+                      className={`mt-0.5 text-xs font-medium ${
+                        isSelected ? "text-indigo-100" : isToday ? "text-sky-800" : "text-slate-500"
                       }`}
                     >
                       {dateObj.toLocaleString("en-US", { month: "short" })}
                     </div>
-                    <div className={`mt-1 text-[11px] ${isSelected ? "text-white/70" : "text-slate-400"}`}>
+                    <div
+                      className={`mt-1 text-[11px] font-medium tabular-nums ${
+                        isSelected ? "text-indigo-100/90" : "text-slate-500"
+                      }`}
+                    >
                       {dayShiftCountMap[item.date] || 0} shifts
                     </div>
                   </button>
@@ -589,45 +658,57 @@ export default function ScheduleSection({
               })}
             </div>
 
-            <div className="grid grid-cols-[260px_repeat(7,minmax(120px,1fr))] border-b border-slate-200 bg-white">
-              <div className="sticky left-0 z-10 border-r border-slate-200 bg-white p-4">
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Open shifts</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">0 unassigned</p>
+            <div className={`${gridTemplate} border-b border-slate-200 bg-slate-50/40`}>
+              <div className="sticky left-0 z-10 border-r-2 border-slate-200 bg-slate-50 px-3 py-3 shadow-[inset_-1px_0_0_rgba(15,23,42,0.04)] sm:px-4">
+                <div className="rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-2 shadow-sm">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Open shifts</p>
+                  <p className="mt-0.5 text-sm font-semibold text-slate-900">0 unassigned</p>
                 </div>
               </div>
               {weekDates.map((item: any) => (
                 <div
                   key={`open-${item.date}`}
-                  className={`min-h-[84px] border-r border-slate-200 p-3 transition last:border-r-0 ${
-                    item.date === todayDate ? "bg-blue-50/50" : ""
+                  className={`min-h-[92px] border-r border-slate-200 bg-white px-2.5 py-2.5 transition last:border-r-0 sm:min-h-[96px] sm:px-3 sm:py-3 ${
+                    item.date === todayDate ? "bg-sky-50/60" : ""
                   }`}
                 >
-                  <div className="text-xs text-slate-400">No open shift</div>
+                  <div className="text-[11px] font-medium text-slate-500">No open shift</div>
                 </div>
               ))}
             </div>
 
             {scheduleGridEmployees.length === 0 ? (
-              <div className="grid grid-cols-[260px_repeat(7,minmax(120px,1fr))]">
-                <div className="sticky left-0 z-10 border-r border-slate-200 bg-white p-4">
+              <div className={gridTemplate}>
+                <div className="sticky left-0 z-10 border-r-2 border-slate-200 bg-slate-50 p-3 sm:p-4">
                   {isAdmin ? (
-                    <button type="button" onClick={onAddEmployeeCta} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    <button
+                      type="button"
+                      onClick={onAddEmployeeCta}
+                      className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
+                    >
                       + Create employee
                     </button>
                   ) : null}
                 </div>
-                <div className="col-span-7 p-10 text-center">
+                <div className="col-span-7 p-8 text-center sm:p-10">
                   <p className="text-lg font-semibold text-slate-900">No shifts scheduled yet</p>
                   <p className="mt-2 text-sm text-slate-600">
                     Click a cell to create your first shift, or add more employees.
                   </p>
                   {isAdmin ? (
                     <div className="mt-4 flex flex-wrap justify-center gap-2">
-                      <button type="button" onClick={onCreateShiftCta} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                      <button
+                        type="button"
+                        onClick={onCreateShiftCta}
+                        className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+                      >
                         Create shift
                       </button>
-                      <button type="button" onClick={onAddEmployeeCta} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                      <button
+                        type="button"
+                        onClick={onAddEmployeeCta}
+                        className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
+                      >
                         Add employee
                       </button>
                     </div>
@@ -642,26 +723,27 @@ export default function ScheduleSection({
                   return (
                     <div
                       key={employeeNameValue}
-                      className={`grid grid-cols-[260px_repeat(7,minmax(120px,1fr))] border-b border-slate-200 transition last:border-b-0 ${
-                        activeEmployeeRow === employeeNameValue ? "bg-slate-50/70" : ""
+                      className={`${gridTemplate} border-b border-slate-200 transition last:border-b-0 ${
+                        activeEmployeeRow === employeeNameValue ? "bg-slate-50/80" : "bg-white"
                       }`}
                       onMouseEnter={() => setActiveEmployeeRow(employeeNameValue)}
                     >
                       <div
-                        className={`sticky left-0 z-10 border-r border-slate-200 p-4 transition ${
+                        className={`sticky left-0 z-10 border-r-2 border-slate-200 px-3 py-3 shadow-[inset_-1px_0_0_rgba(15,23,42,0.04)] transition sm:px-4 sm:py-3.5 ${
                           activeEmployeeRow === employeeNameValue
                             ? "bg-slate-100"
-                            : "bg-white hover:bg-slate-50"
+                            : "bg-slate-50 hover:bg-slate-100/90"
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+                        <div className="flex items-center gap-2.5 sm:gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-indigo-950 text-xs font-bold text-white shadow-sm">
                             {getInitials(employeeNameValue)}
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">{employeeNameValue}</p>
-                            <p className="text-xs text-slate-500">
-                              {employeeInfo?.defaultRole || "No role"} • {employeeStats.shifts} shifts • {employeeStats.planned.toFixed(1)}h
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-900">{employeeNameValue}</p>
+                            <p className="mt-0.5 text-[11px] font-medium leading-snug text-slate-500">
+                              {employeeInfo?.defaultRole || "No role"} · {employeeStats.shifts} shifts ·{" "}
+                              {employeeStats.planned.toFixed(1)}h planned
                             </p>
                           </div>
                         </div>
@@ -688,12 +770,12 @@ export default function ScheduleSection({
                               }));
                               setOpenMenuId(null);
                             }}
-                            className={`group min-h-[126px] cursor-pointer border-r border-slate-200 p-3 align-top transition last:border-r-0 ${
+                            className={`group min-h-[118px] cursor-pointer border-r border-slate-200 bg-white px-2.5 py-2.5 align-top transition last:border-r-0 sm:min-h-[128px] sm:px-3 sm:py-3 ${
                               isSelected
-                                ? "bg-slate-100 ring-1 ring-inset ring-slate-200"
+                                ? "bg-indigo-50 ring-2 ring-inset ring-indigo-300/90"
                                 : item.date === todayDate
-                                ? "bg-blue-50/60 hover:bg-blue-50"
-                                : "bg-white hover:bg-slate-50"
+                                ? "bg-sky-50/70 hover:bg-sky-50"
+                                : "hover:bg-slate-50/90"
                             }`}
                           >
                             {dayShifts.length > 0 ? (
@@ -706,7 +788,7 @@ export default function ScheduleSection({
                                     </div>
                                   </div>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                   {dayShifts.map((shift: any) => (
                                     <ShiftMiniCard
                                       key={shift.id}
@@ -720,7 +802,7 @@ export default function ScheduleSection({
                                 </div>
                               </div>
                             ) : isUnavailable ? (
-                              <div className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                              <div className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-900">
                                 Unavailable
                               </div>
                             ) : (
@@ -749,17 +831,24 @@ export default function ScheduleSection({
                   );
                 })}
 
-                <div className="grid grid-cols-[260px_repeat(7,minmax(120px,1fr))] bg-white">
-                  <div className="sticky left-0 z-10 border-r border-slate-200 bg-white p-4">
+                <div className={`${gridTemplate} border-t border-slate-200 bg-slate-50/50`}>
+                  <div className="sticky left-0 z-10 border-r-2 border-slate-200 bg-slate-50 p-3 sm:p-4">
                     {isAdmin ? (
-                      <button type="button" onClick={onAddEmployeeCta} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                      <button
+                        type="button"
+                        onClick={onAddEmployeeCta}
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
+                      >
                         + Create employee
                       </button>
                     ) : null}
                   </div>
                   {weekDates.map((item: any) => (
-                    <div key={`foot-${item.date}`} className="min-h-[56px] border-r border-slate-200 p-3 last:border-r-0">
-                      <div className="text-xs text-slate-300">•</div>
+                    <div
+                      key={`foot-${item.date}`}
+                      className="min-h-[52px] border-r border-slate-200 bg-white px-2.5 py-2 last:border-r-0 sm:min-h-[56px] sm:px-3 sm:py-2.5"
+                    >
+                      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-300">—</div>
                     </div>
                   ))}
                 </div>
@@ -769,47 +858,51 @@ export default function ScheduleSection({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Hours</p>
-            <p className="mt-1 text-lg font-bold text-slate-900">{weeklyPlannedHours.toFixed(1)}</p>
+      <div className="w-full">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          <div className="flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Planned hours</p>
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">{weeklyPlannedHours.toFixed(1)}</p>
           </div>
-          <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Payroll</p>
-            <p className="mt-1 text-lg font-bold text-slate-900">£{weeklyPlannedPayroll.toFixed(2)}</p>
+          <div className="flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Payroll (planned)</p>
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">£{weeklyPlannedPayroll.toFixed(2)}</p>
           </div>
-          <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Revenue (forecast)</p>
-            <p className="mt-1 text-lg font-bold text-slate-900">£{weeklyForecastRevenue.toFixed(2)}</p>
+          <div className="flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Revenue (forecast)</p>
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">£{weeklyForecastRevenue.toFixed(2)}</p>
           </div>
-          <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Revenue (actual)</p>
-            <p className="mt-1 text-lg font-bold text-slate-900">£{weeklyActualRevenue.toFixed(2)}</p>
+          <div className="flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Revenue (actual)</p>
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">£{weeklyActualRevenue.toFixed(2)}</p>
           </div>
-          <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Payroll percentage</p>
-            <p className="mt-1 text-lg font-bold text-slate-900">{payrollPercentage.toFixed(1)}%</p>
+          <div className="flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Payroll %</p>
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">{payrollPercentage.toFixed(1)}%</p>
           </div>
-          <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Worked hours</p>
-            <p className="mt-1 text-lg font-bold text-slate-900">{weeklyWorkedHours.toFixed(1)}</p>
+          <div className="flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Worked hours</p>
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">{weeklyWorkedHours.toFixed(1)}</p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-800">
-            {selectedDayName} details
-          </h3>
-          <p className="text-xs text-slate-500">
-            Planned {dayHours.toFixed(1)}h • Actual {dayWorkedHours.toFixed(1)}h
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-4 flex flex-col gap-1 border-b border-slate-100 pb-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold tracking-tight text-slate-900">{selectedDayName}</h3>
+            <p className="mt-1 text-xs font-medium text-slate-500">Shift list and time actions for the selected day.</p>
+          </div>
+          <p className="text-xs font-semibold tabular-nums text-slate-600 sm:text-right">
+            Planned {dayHours.toFixed(1)}h <span className="text-slate-300">·</span> Actual {dayWorkedHours.toFixed(1)}h
           </p>
         </div>
         {filteredShifts.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
-            No shifts for this date.
+          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+            <p className="text-sm font-semibold text-slate-800">Nothing scheduled</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+              Pick another day in the grid or add a shift to build coverage for this date.
+            </p>
           </div>
         ) : (
           <div className="space-y-3">

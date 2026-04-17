@@ -2113,16 +2113,14 @@ async function handleLogout() {
   );
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="flex min-h-screen w-full flex-col bg-slate-200/40 text-slate-900">
       <datalist id="role-suggestions">
         {roleSuggestions.map((role) => (
           <option key={role} value={role} />
         ))}
       </datalist>
-      <div className="mx-auto max-w-7xl px-4 pb-6 pt-3 md:px-8 md:pt-4">
-        {/* A. Top bar — compact */}
-        <header className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-slate-200/90 bg-white px-3 py-2 shadow-sm md:px-4 md:py-2.5">
-          <span className="text-base font-semibold tracking-tight text-slate-900 md:text-lg">
+      <header className="sticky top-0 z-40 flex h-14 w-full shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-[0_1px_0_rgba(15,23,42,0.06)] xl:px-6 2xl:px-8">
+          <span className="text-lg font-semibold tracking-tight text-indigo-950">
             Planyo
           </span>
           <div className="relative" ref={userMenuRef}>
@@ -2173,6 +2171,7 @@ async function handleLogout() {
           </div>
         </header>
 
+        <div className="flex w-full flex-1 flex-col px-4 pb-10 pt-4 xl:px-6 2xl:px-8">
         {/* B + C — dashboard hero + actions/stats (home only) */}
         {activeTab === "home" ? (
           <div className="mb-6 rounded-2xl border border-slate-200/80 bg-gradient-to-b from-slate-50 via-white to-white p-5 shadow-sm md:p-6">
@@ -2369,9 +2368,11 @@ async function handleLogout() {
           </div>
         ) : null}
 
-        {/* TOP NAVIGATION TABS */}
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="flex flex-wrap gap-2">
+        {/* TOP NAVIGATION */}
+        <nav
+          aria-label="Main"
+          className="-mx-4 mb-5 flex flex-wrap items-end gap-1 border-b border-slate-200 bg-white px-4 pb-0 pt-1 shadow-sm xl:-mx-6 xl:px-6 2xl:-mx-8 2xl:px-8"
+        >
             <div className="relative" ref={homeMenuRef}>
             <button
               type="button"
@@ -2383,13 +2384,13 @@ async function handleLogout() {
                 setIsSettingsMenuOpen(false);
                 setIsUserMenuOpen(false);
               }}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+              className={`inline-flex h-9 items-center gap-1 rounded-md border-b-2 px-3 text-sm font-medium transition ${
                 activeTab === "home" || isHomeMenuOpen
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                  ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
+                  : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              Home <span className="ml-1 text-xs">▾</span>
+              Home <span className="text-[10px] opacity-70">▾</span>
             </button>
             {isHomeMenuOpen ? (
               <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
@@ -2456,13 +2457,13 @@ async function handleLogout() {
                 setIsSettingsMenuOpen(false);
                 setIsUserMenuOpen(false);
               }}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+              className={`inline-flex h-9 items-center gap-1 rounded-md border-b-2 px-3 text-sm font-medium transition ${
                 activeTab === "schedule" || isScheduleMenuOpen
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                  ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
+                  : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              Schedule <span className="ml-1 text-xs">▾</span>
+              Schedule <span className="text-[10px] opacity-70">▾</span>
             </button>
             {isScheduleMenuOpen ? (
               <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
@@ -2530,13 +2531,13 @@ async function handleLogout() {
                   setIsSettingsMenuOpen(false);
                   setIsUserMenuOpen(false);
                 }}
-                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                className={`inline-flex h-9 items-center gap-1 rounded-md border-b-2 px-3 text-sm font-medium transition ${
                   activeTab === "employees" || isPeopleMenuOpen
-                    ? "bg-slate-900 text-white"
-                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                    ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
+                    : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
-                People <span className="ml-1 text-xs">▾</span>
+                People <span className="text-[10px] opacity-70">▾</span>
               </button>
               <div
                 className={`absolute left-0 z-30 mt-2 w-60 origin-top rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_14px_34px_rgba(15,23,42,0.16)] transition duration-150 ${
@@ -2600,13 +2601,13 @@ async function handleLogout() {
                   setIsSettingsMenuOpen(false);
                   setIsUserMenuOpen(false);
                 }}
-                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                className={`inline-flex h-9 items-center gap-1 rounded-md border-b-2 px-3 text-sm font-medium transition ${
                   activeTab === "payroll" || isPayrollMenuOpen
-                    ? "bg-slate-900 text-white"
-                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                    ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
+                    : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
-                Payroll <span className="ml-1 text-xs">▾</span>
+                Payroll <span className="text-[10px] opacity-70">▾</span>
               </button>
               {isPayrollMenuOpen ? (
                 <div className="absolute left-0 z-30 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
@@ -2646,13 +2647,13 @@ async function handleLogout() {
                 setIsPayrollMenuOpen(false);
                 setIsUserMenuOpen(false);
               }}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+              className={`inline-flex h-9 items-center gap-1 rounded-md border-b-2 px-3 text-sm font-medium transition ${
                 isSettingsMenuOpen
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                  ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
+                  : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              Settings <span className="ml-1 text-xs">▾</span>
+              Settings <span className="text-[10px] opacity-70">▾</span>
             </button>
             {isSettingsMenuOpen ? (
               <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
@@ -2701,17 +2702,16 @@ async function handleLogout() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as AppTab)}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+              className={`inline-flex h-9 items-center rounded-md border-b-2 px-3 text-sm font-medium transition ${
                 activeTab === tab.key
-                  ? " bg-slate-900 text-white"
-                  : " bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                  ? "border-indigo-600 bg-indigo-50/90 text-indigo-950"
+                  : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
               {tab.label}
             </button>
           ))}
-          </div>
-        </div>
+        </nav>
 
         {activeTab === "home" && (
           <HomeDashboardSection
