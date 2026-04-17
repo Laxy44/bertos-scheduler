@@ -1,21 +1,28 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  addCalendarMonthsFirst,
+  formatScheduleRangeLabel,
+  getPlannerColumnDates,
+  snapAnchorForView,
+  type ScheduleViewKind,
+} from "../../lib/schedule-view-utils";
+import { addDays, fromDateInputValue, getMonthCalendarDays, getWeekDates, startOfWeek, toDateInputValue } from "../../lib/utils";
 import ScheduleControls from "./ScheduleControls";
 import PlannerSubTabsRow from "./PlannerSubTabsRow";
-import ScheduleGrid from "./ScheduleGrid";
+import ScheduleViewRouter from "./ScheduleViewRouter";
 
 /**
- * Single schedule experience: shared grid + controls; `isReadOnly` derives from admin membership.
+ * Single schedule experience: view router + controls; `isReadOnly` derives from admin membership.
  */
 export default function SchedulePage(props: any) {
   const isReadOnly = !props.isAdmin;
 
   const {
-    goPrev,
-    goNext,
-    goToday,
-    weekDates,
+    setWeekStart,
+    monthNames,
     shifts,
     employees,
     selectedDate,
@@ -55,6 +62,147 @@ export default function SchedulePage(props: any) {
     dayWorkedHours,
   } = props;
 
+  const safeSetWeekStart = setWeekStart ?? (() => {});
+
+  const [scheduleView, setScheduleView] = useState<ScheduleViewKind>("week");
+  const [navigatorAnchor, setNavigatorAnchor] = useState<Date>(() => {
+    const ws = props.weekStart instanceof Date ? props.weekStart : new Date(props.weekStart);
+    return startOfWeek(ws);
+  });
+
+  useEffect(() => {
+    if (scheduleView !== "week" && scheduleView !== "two_weeks") return;
+    const monday = startOfWeek(
+      props.weekStart instanceof Date ? props.weekStart : new Date(props.weekStart)
+    );
+    setNavigatorAnchor((prev) => (prev.getTime() === monday.getTime() ? prev : monday));
+  }, [props.weekStart, scheduleView]);
+
+  useEffect(() => {
+    if (scheduleView !== "day") return;
+    const d = fromDateInputValue(selectedDate);
+    d.setHours(0, 0, 0, 0);
+    setNavigatorAnchor((prev) => (prev.getTime() === d.getTime() ? prev : d));
+  }, [selectedDate, scheduleView]);
+
+  const handleViewKindChange = useCallback(
+    (next: ScheduleViewKind) => {
+      const ref = fromDateInputValue(selectedDate);
+      const anchor = snapAnchorForView(next, ref);
+      setNavigatorAnchor(anchor);
+      safeSetWeekStart(startOfWeek(ref));
+      setScheduleView(next);
+    },
+    [selectedDate, safeSetWeekStart]
+  );
+
+  const handleGoPrev = useCallback(() => {
+    if (scheduleView === "day") {
+      const d = addDays(navigatorAnchor, -1);
+      setNavigatorAnchor(d);
+      setSelectedDate(toDateInputValue(d));
+      safeSetWeekStart(startOfWeek(d));
+      return;
+    }
+    if (scheduleView === "week") {
+      const d = addDays(navigatorAnchor, -7);
+      setNavigatorAnchor(d);
+      safeSetWeekStart(d);
+      setSelectedDate(toDateInputValue(d));
+      return;
+    }
+    if (scheduleView === "two_weeks") {
+      const d = addDays(navigatorAnchor, -14);
+      setNavigatorAnchor(d);
+      safeSetWeekStart(d);
+      setSelectedDate(toDateInputValue(d));
+      return;
+    }
+    const firstPrev = addCalendarMonthsFirst(navigatorAnchor, -1);
+    setNavigatorAnchor(firstPrev);
+    safeSetWeekStart(startOfWeek(firstPrev));
+    setSelectedDate(toDateInputValue(firstPrev));
+  }, [navigatorAnchor, scheduleView, safeSetWeekStart, setSelectedDate]);
+
+  const handleGoNext = useCallback(() => {
+    if (scheduleView === "day") {
+      const d = addDays(navigatorAnchor, 1);
+      setNavigatorAnchor(d);
+      setSelectedDate(toDateInputValue(d));
+      safeSetWeekStart(startOfWeek(d));
+      return;
+    }
+    if (scheduleView === "week") {
+      const d = addDays(navigatorAnchor, 7);
+      setNavigatorAnchor(d);
+      safeSetWeekStart(d);
+      setSelectedDate(toDateInputValue(d));
+      return;
+    }
+    if (scheduleView === "two_weeks") {
+      const d = addDays(navigatorAnchor, 14);
+      setNavigatorAnchor(d);
+      safeSetWeekStart(d);
+      setSelectedDate(toDateInputValue(d));
+      return;
+    }
+    const firstNext = addCalendarMonthsFirst(navigatorAnchor, 1);
+    setNavigatorAnchor(firstNext);
+    safeSetWeekStart(startOfWeek(firstNext));
+    setSelectedDate(toDateInputValue(firstNext));
+  }, [navigatorAnchor, scheduleView, safeSetWeekStart, setSelectedDate]);
+
+  const handleGoToday = useCallback(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    if (scheduleView === "day") {
+      setNavigatorAnchor(t);
+      safeSetWeekStart(startOfWeek(t));
+      setSelectedDate(toDateInputValue(t));
+      return;
+    }
+    if (scheduleView === "week" || scheduleView === "two_weeks") {
+      const w = startOfWeek(t);
+      setNavigatorAnchor(w);
+      safeSetWeekStart(w);
+      setSelectedDate(toDateInputValue(t));
+      return;
+    }
+    const first = new Date(t.getFullYear(), t.getMonth(), 1);
+    setNavigatorAnchor(first);
+    safeSetWeekStart(startOfWeek(t));
+    setSelectedDate(toDateInputValue(t));
+  }, [scheduleView, safeSetWeekStart, setSelectedDate]);
+
+  const columnDates = useMemo(() => {
+    if (scheduleView === "week") {
+      return getWeekDates(startOfWeek(navigatorAnchor));
+    }
+    if (scheduleView === "two_weeks") {
+      return getPlannerColumnDates(startOfWeek(navigatorAnchor), 14);
+    }
+    if (scheduleView === "day") {
+      return getPlannerColumnDates(navigatorAnchor, 1);
+    }
+    return getWeekDates(startOfWeek(navigatorAnchor));
+  }, [scheduleView, navigatorAnchor]);
+
+  const visibleDateSet = useMemo(() => {
+    if (scheduleView === "month") {
+      const month = navigatorAnchor.getMonth() + 1;
+      const year = navigatorAnchor.getFullYear();
+      return new Set(getMonthCalendarDays(month, year).map((c) => c.date));
+    }
+    return new Set(columnDates.map((item: any) => item.date));
+  }, [scheduleView, navigatorAnchor, columnDates]);
+
+  const gridShifts = useMemo(() => {
+    if (!isReadOnly) return shifts;
+    const self = (employeeName || "").trim();
+    if (!self) return [];
+    return shifts.filter((s: any) => s.employee === self);
+  }, [isReadOnly, shifts, employeeName]);
+
   const scheduleGridEmployees =
     employeeFilter === "All"
       ? employeeNames.filter((name: string) =>
@@ -62,30 +210,27 @@ export default function SchedulePage(props: any) {
         )
       : employeeNames.filter((name: string) => name === employeeFilter);
 
-  const weekRangeLabel = `${weekDates[0]?.date || ""} - ${
-    weekDates[weekDates.length - 1]?.date || ""
-  }`;
+  const weekRangeLabel = formatScheduleRangeLabel(scheduleView, navigatorAnchor, monthNames);
 
-  const weekDateSet = new Set(weekDates.map((item: any) => item.date));
-  const visibleWeekShifts = shifts.filter((shift: any) => weekDateSet.has(shift.date));
+  const visiblePeriodShifts = gridShifts.filter((shift: any) => visibleDateSet.has(shift.date));
 
   const employeeRateByName = employees.reduce((acc: Record<string, number>, employee: any) => {
     acc[employee.name] = Number(employee.hourlyRate || 0);
     return acc;
   }, {});
 
-  const weeklyPlannedHours = visibleWeekShifts.reduce(
+  const weeklyPlannedHours = visiblePeriodShifts.reduce(
     (sum: number, shift: any) => sum + getPlannedHours(shift),
     0
   );
-  const weeklyWorkedHours = visibleWeekShifts.reduce(
+  const weeklyWorkedHours = visiblePeriodShifts.reduce(
     (sum: number, shift: any) => sum + getWorkedHours(shift),
     0
   );
-  const weeklyPlannedPayroll = visibleWeekShifts.reduce((sum: number, shift: any) => {
+  const weeklyPlannedPayroll = visiblePeriodShifts.reduce((sum: number, shift: any) => {
     return sum + getPlannedHours(shift) * (employeeRateByName[shift.employee] || 0);
   }, 0);
-  const weeklyWorkedPayroll = visibleWeekShifts.reduce((sum: number, shift: any) => {
+  const weeklyWorkedPayroll = visiblePeriodShifts.reduce((sum: number, shift: any) => {
     return sum + getWorkedHours(shift) * (employeeRateByName[shift.employee] || 0);
   }, 0);
 
@@ -128,6 +273,18 @@ export default function SchedulePage(props: any) {
     setOpenMenuId(null);
   };
 
+  const onPickMonthCalendarDate = useCallback(
+    (date: string) => {
+      const d = fromDateInputValue(date);
+      setNavigatorAnchor(new Date(d.getFullYear(), d.getMonth(), 1));
+      safeSetWeekStart(startOfWeek(d));
+      setSelectedDate(date);
+      setForm((current: any) => ({ ...current, date }));
+      setOpenMenuId(null);
+    },
+    [safeSetWeekStart, setSelectedDate, setForm, setOpenMenuId]
+  );
+
   const kpiCardClass = isReadOnly
     ? "flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200/90 bg-slate-50 px-4 py-3 shadow-sm"
     : "flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm";
@@ -137,18 +294,22 @@ export default function SchedulePage(props: any) {
       {isReadOnly ? (
         <ScheduleControls
           isReadOnly
-          goToday={goToday}
-          goPrev={goPrev}
-          goNext={goNext}
+          viewKind={scheduleView}
+          onViewKindChange={handleViewKindChange}
+          goToday={handleGoToday}
+          goPrev={handleGoPrev}
+          goNext={handleGoNext}
           weekRangeLabel={weekRangeLabel}
         />
       ) : (
         <div className="space-y-0 rounded-xl border border-slate-200 bg-white shadow-sm">
           <ScheduleControls
             isReadOnly={false}
-            goToday={goToday}
-            goPrev={goPrev}
-            goNext={goNext}
+            viewKind={scheduleView}
+            onViewKindChange={handleViewKindChange}
+            goToday={handleGoToday}
+            goPrev={handleGoPrev}
+            goNext={handleGoNext}
             weekRangeLabel={weekRangeLabel}
           />
           <PlannerSubTabsRow
@@ -160,10 +321,15 @@ export default function SchedulePage(props: any) {
         </div>
       )}
 
-      <ScheduleGrid
+      <ScheduleViewRouter
+        view={scheduleView}
+        month={navigatorAnchor.getMonth() + 1}
+        year={navigatorAnchor.getFullYear()}
+        monthNames={monthNames}
+        onPickMonthCalendarDate={onPickMonthCalendarDate}
+        columnDates={columnDates}
         isReadOnly={isReadOnly}
-        weekDates={weekDates}
-        shifts={shifts}
+        shifts={gridShifts}
         employees={employees}
         scheduleGridEmployees={scheduleGridEmployees}
         selectedDate={selectedDate}

@@ -2,10 +2,14 @@
 
 import { useRef, useState } from "react";
 import { AnchoredMenu } from "../ui/AnchoredMenu";
+import type { ScheduleViewKind } from "../../lib/schedule-view-utils";
+import { labelFromViewKind } from "../../lib/schedule-view-utils";
 
 export const SCHEDULE_VIEW_OPTIONS = ["Day", "Week", "2 Weeks", "Month"] as const;
 
 type ScheduleViewNavigationProps = {
+  viewKind: ScheduleViewKind;
+  onViewKindChange: (next: ScheduleViewKind) => void;
   goToday: () => void;
   goPrev: () => void;
   goNext: () => void;
@@ -13,18 +17,20 @@ type ScheduleViewNavigationProps = {
 };
 
 /**
- * Shared left cluster: view range (Day / Week / …) + Today + week step + date range badge.
- * View selection is UI state only until calendar supports multi-range views.
+ * Shared left cluster: view range (Day / Week / …) + Today + step controls + date range badge.
  */
 export default function ScheduleViewNavigation({
+  viewKind,
+  onViewKindChange,
   goToday,
   goPrev,
   goNext,
   weekRangeLabel,
 }: ScheduleViewNavigationProps) {
   const [openViewMenu, setOpenViewMenu] = useState(false);
-  const [selectedViewLabel, setSelectedViewLabel] = useState("Week");
   const viewAnchorRef = useRef<HTMLDivElement>(null);
+
+  const selectedViewLabel = labelFromViewKind(viewKind);
 
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -64,7 +70,14 @@ export default function ScheduleViewNavigation({
                 role="menuitemradio"
                 aria-checked={isActive}
                 onClick={() => {
-                  setSelectedViewLabel(option);
+                  const map: Record<string, ScheduleViewKind> = {
+                    Day: "day",
+                    Week: "week",
+                    "2 Weeks": "two_weeks",
+                    Month: "month",
+                  };
+                  const next = map[option];
+                  if (next) onViewKindChange(next);
                   setOpenViewMenu(false);
                 }}
                 className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${

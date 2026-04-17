@@ -4,12 +4,12 @@
 import { useMemo, useState } from "react";
 import ShiftMiniCard from "./ShiftMiniCard";
 
-const GRID_TEMPLATE =
-  "grid grid-cols-[minmax(14rem,17rem)_repeat(7,minmax(7.75rem,1fr))]";
+export type PlannerGridVariant = "week" | "two_week" | "day";
 
 type ScheduleGridProps = {
   isReadOnly: boolean;
-  weekDates: any[];
+  columnDates: any[];
+  plannerVariant?: PlannerGridVariant;
   shifts: any[];
   employees: any[];
   scheduleGridEmployees: string[];
@@ -28,7 +28,8 @@ type ScheduleGridProps = {
 
 export default function ScheduleGrid({
   isReadOnly,
-  weekDates,
+  columnDates,
+  plannerVariant = "week",
   shifts,
   employees,
   scheduleGridEmployees,
@@ -46,6 +47,23 @@ export default function ScheduleGrid({
 }: ScheduleGridProps) {
   const [activeEmployeeRow, setActiveEmployeeRow] = useState<string | null>(null);
 
+  const colCount = columnDates.length;
+
+  const gridColumnsStyle = useMemo(() => {
+    const minCol =
+      colCount === 1
+        ? "minmax(12rem, 1fr)"
+        : colCount > 7
+          ? "minmax(5.25rem, 1fr)"
+          : "minmax(7.75rem, 1fr)";
+    return { gridTemplateColumns: `minmax(14rem, 17rem) repeat(${colCount}, ${minCol})` } as const;
+  }, [colCount]);
+
+  const minOuterWidth = useMemo(() => {
+    const per = colCount > 7 ? 72 : colCount === 1 ? 360 : 100;
+    return Math.max(520, 220 + colCount * per);
+  }, [colCount]);
+
   const todayDate = useMemo(() => {
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -54,10 +72,10 @@ export default function ScheduleGrid({
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
-  const weekDateSet = new Set(weekDates.map((item: any) => item.date));
-  const visibleWeekShifts = shifts.filter((shift: any) => weekDateSet.has(shift.date));
+  const visibleDateSet = new Set(columnDates.map((item: any) => item.date));
+  const visiblePeriodShifts = shifts.filter((shift: any) => visibleDateSet.has(shift.date));
 
-  const dayShiftCountMap = weekDates.reduce((acc: Record<string, number>, item: any) => {
+  const dayShiftCountMap = columnDates.reduce((acc: Record<string, number>, item: any) => {
     acc[item.date] = shifts.filter((shift: any) => shift.date === item.date).length;
     return acc;
   }, {});
@@ -75,8 +93,8 @@ export default function ScheduleGrid({
     return "border-slate-200 bg-white text-slate-600";
   };
 
-  const getEmployeeWeekStats = (employeeNameValue: string) => {
-    const employeeShifts = visibleWeekShifts.filter(
+  const getEmployeePeriodStats = (employeeNameValue: string) => {
+    const employeeShifts = visiblePeriodShifts.filter(
       (shift: any) => shift.employee === employeeNameValue
     );
     const planned = employeeShifts.reduce(
@@ -109,23 +127,33 @@ export default function ScheduleGrid({
     ? "w-full overflow-x-auto rounded-xl border border-slate-200 bg-slate-50/40 shadow-sm"
     : "w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm";
 
+  const railTitle =
+    plannerVariant === "day"
+      ? "Day schedule"
+      : plannerVariant === "two_week"
+        ? "Two-week planner"
+        : "Schedule";
+  const railHeading =
+    plannerVariant === "day" ? "Single-day coverage" : "People & open shifts";
+  const railBody =
+    plannerVariant === "day"
+      ? "One column for the selected date."
+      : "Rail stays fixed while you scroll dates.";
+
   return (
     <div className={gridShell}>
       <div className="max-h-[76vh] w-full overflow-auto">
-        <div className="min-w-[1020px]">
+        <div style={{ minWidth: minOuterWidth }}>
           <div
-            className={`sticky top-0 z-20 ${GRID_TEMPLATE} border-b-2 border-slate-200 bg-slate-100 shadow-[0_1px_0_0_rgba(15,23,42,0.06)]`}
+            className="sticky top-0 z-20 grid border-b-2 border-slate-200 bg-slate-100 shadow-[0_1px_0_0_rgba(15,23,42,0.06)]"
+            style={gridColumnsStyle}
           >
             <div className="sticky left-0 z-30 border-r-2 border-slate-200 bg-slate-100 px-3 py-3 shadow-[inset_-1px_0_0_rgba(15,23,42,0.04)] sm:px-4 sm:py-3.5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Schedule</p>
-              <p className="mt-0.5 text-sm font-semibold leading-tight text-slate-900">
-                People & open shifts
-              </p>
-              <p className="mt-1 text-[11px] leading-snug text-slate-500">
-                Rail stays fixed while you scroll dates.
-              </p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">{railTitle}</p>
+              <p className="mt-0.5 text-sm font-semibold leading-tight text-slate-900">{railHeading}</p>
+              <p className="mt-1 text-[11px] leading-snug text-slate-500">{railBody}</p>
             </div>
-            {weekDates.map((item: any) => {
+            {columnDates.map((item: any) => {
               const dateObj = new Date(item.date);
               const isSelected = selectedDate === item.date;
               const isToday = item.date === todayDate;
@@ -142,8 +170,8 @@ export default function ScheduleGrid({
                     isSelected
                       ? "bg-indigo-600 text-white shadow-[inset_0_-3px_0_rgba(255,255,255,0.12)]"
                       : isToday
-                      ? "bg-sky-50 text-slate-900 ring-1 ring-inset ring-sky-200/90 hover:bg-sky-100/80"
-                      : "bg-white text-slate-800 hover:bg-slate-50"
+                        ? "bg-sky-50 text-slate-900 ring-1 ring-inset ring-sky-200/90 hover:bg-sky-100/80"
+                        : "bg-white text-slate-800 hover:bg-slate-50"
                   }`}
                 >
                   <div
@@ -175,14 +203,17 @@ export default function ScheduleGrid({
             })}
           </div>
 
-          <div className={`${GRID_TEMPLATE} border-b border-slate-200 bg-slate-50/40`}>
+          <div
+            className="grid border-b border-slate-200 bg-slate-50/40"
+            style={gridColumnsStyle}
+          >
             <div className="sticky left-0 z-10 border-r-2 border-slate-200 bg-slate-50 px-3 py-3 shadow-[inset_-1px_0_0_rgba(15,23,42,0.04)] sm:px-4">
               <div className="rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-2 shadow-sm">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Open shifts</p>
                 <p className="mt-0.5 text-sm font-semibold text-slate-900">0 unassigned</p>
               </div>
             </div>
-            {weekDates.map((item: any) => (
+            {columnDates.map((item: any) => (
               <div
                 key={`open-${item.date}`}
                 className={`min-h-[92px] border-r border-slate-200 bg-white px-2.5 py-2.5 transition last:border-r-0 sm:min-h-[96px] sm:px-3 sm:py-3 ${
@@ -195,7 +226,7 @@ export default function ScheduleGrid({
           </div>
 
           {scheduleGridEmployees.length === 0 ? (
-            <div className={GRID_TEMPLATE}>
+            <div className="grid" style={gridColumnsStyle}>
               <div className="sticky left-0 z-10 border-r-2 border-slate-200 bg-slate-50 p-3 sm:p-4">
                 {!isReadOnly ? (
                   <button
@@ -207,7 +238,7 @@ export default function ScheduleGrid({
                   </button>
                 ) : null}
               </div>
-              <div className="col-span-7 p-8 text-center sm:p-10">
+              <div className="p-8 text-center sm:p-10" style={{ gridColumn: `2 / span ${colCount}` }}>
                 <p className="text-lg font-semibold text-slate-900">No shifts scheduled yet</p>
                 <p className="mt-2 text-sm text-slate-600">
                   {isReadOnly
@@ -238,13 +269,14 @@ export default function ScheduleGrid({
             <>
               {scheduleGridEmployees.map((employeeNameValue: string) => {
                 const employeeInfo = employees.find((employee: any) => employee.name === employeeNameValue);
-                const employeeStats = getEmployeeWeekStats(employeeNameValue);
+                const employeeStats = getEmployeePeriodStats(employeeNameValue);
                 return (
                   <div
                     key={employeeNameValue}
-                    className={`${GRID_TEMPLATE} border-b border-slate-200 transition last:border-b-0 ${
+                    className={`grid border-b border-slate-200 transition last:border-b-0 ${
                       activeEmployeeRow === employeeNameValue ? "bg-slate-50/80" : "bg-white"
                     }`}
+                    style={gridColumnsStyle}
                     onMouseEnter={() => setActiveEmployeeRow(employeeNameValue)}
                   >
                     <div
@@ -267,7 +299,7 @@ export default function ScheduleGrid({
                         </div>
                       </div>
                     </div>
-                    {weekDates.map((item: any) => {
+                    {columnDates.map((item: any) => {
                       const dayShifts = shifts
                         .filter(
                           (shift: any) => shift.employee === employeeNameValue && shift.date === item.date
@@ -302,10 +334,10 @@ export default function ScheduleGrid({
                             isSelected
                               ? "bg-indigo-50 ring-2 ring-inset ring-indigo-300/90"
                               : item.date === todayDate
-                              ? "bg-sky-50/70 hover:bg-sky-50"
-                              : !isReadOnly
-                              ? "hover:bg-slate-50/90"
-                              : ""
+                                ? "bg-sky-50/70 hover:bg-sky-50"
+                                : !isReadOnly
+                                  ? "hover:bg-slate-50/90"
+                                  : ""
                           }`}
                         >
                           {dayShifts.length > 0 ? (
@@ -330,9 +362,7 @@ export default function ScheduleGrid({
                                     getShiftStatusStyles={getShiftStatusStyles}
                                     readOnly={isReadOnly}
                                     onClick={
-                                      isReadOnly
-                                        ? undefined
-                                        : () => openShiftFromGrid(shift)
+                                      isReadOnly ? undefined : () => openShiftFromGrid(shift)
                                     }
                                   />
                                 ))}
@@ -372,7 +402,7 @@ export default function ScheduleGrid({
                 );
               })}
 
-              <div className={`${GRID_TEMPLATE} border-t border-slate-200 bg-slate-50/50`}>
+              <div className="grid border-t border-slate-200 bg-slate-50/50" style={gridColumnsStyle}>
                 <div className="sticky left-0 z-10 border-r-2 border-slate-200 bg-slate-50 p-3 sm:p-4">
                   {!isReadOnly ? (
                     <button
@@ -384,7 +414,7 @@ export default function ScheduleGrid({
                     </button>
                   ) : null}
                 </div>
-                {weekDates.map((item: any) => (
+                {columnDates.map((item: any) => (
                   <div
                     key={`foot-${item.date}`}
                     className="min-h-[52px] border-r border-slate-200 bg-white px-2.5 py-2 last:border-r-0 sm:min-h-[56px] sm:px-3 sm:py-2.5"

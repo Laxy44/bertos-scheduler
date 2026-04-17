@@ -1,12 +1,15 @@
 "use client";
 
 import { useRef, useState } from "react";
+import type { ScheduleViewKind } from "../../lib/schedule-view-utils";
 import { AnchoredMenu } from "../ui/AnchoredMenu";
 import ScheduleViewNavigation from "./ScheduleViewNavigation";
 
 type ToolbarKey = "templates" | "tools" | "filters" | null;
 
 type ScheduleControlsBarProps = {
+  viewKind: ScheduleViewKind;
+  onViewKindChange: (next: ScheduleViewKind) => void;
   goToday: () => void;
   goPrev: () => void;
   goNext: () => void;
@@ -21,6 +24,8 @@ const filtersOptions = ["All shifts", "Unpublished", "Unassigned"];
  * Admin planner row: shared view navigation + templates / tools / filters / publish.
  */
 export default function ScheduleControlsBar({
+  viewKind,
+  onViewKindChange,
   goToday,
   goPrev,
   goNext,
@@ -47,6 +52,8 @@ export default function ScheduleControlsBar({
     <div className="rounded-t-xl border border-b-0 border-slate-200 bg-white px-3 py-3 sm:px-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <ScheduleViewNavigation
+          viewKind={viewKind}
+          onViewKindChange={onViewKindChange}
           goToday={goToday}
           goPrev={goPrev}
           goNext={goNext}

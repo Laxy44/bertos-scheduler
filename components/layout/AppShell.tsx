@@ -436,11 +436,12 @@ async function handleLogout() {
   useEffect(() => {
     const existsInWeek = weekDates.some((item) => item.date === selectedDate);
     if (!existsInWeek) {
-      setSelectedDate(weekDates[0].date);
-      setCopyFromDate(weekDates[0].date);
+      const anchor = startOfWeek(fromDateInputValue(selectedDate));
+      setWeekStart(anchor);
+      setCopyFromDate(selectedDate);
       setForm((current) => ({
         ...current,
-        date: weekDates[0].date,
+        date: selectedDate,
       }));
     }
   }, [weekDates, selectedDate]);
@@ -2699,10 +2700,7 @@ async function handleLogout() {
         {activeTab === "schedule" && (
   <ScheduleSection
     weekStart={weekStart}
-    goPrev={goToPreviousWeek}
-    goNext={goToNextWeek}
-    goToday={goToThisWeek}
-    weekDates={weekDates}
+    setWeekStart={setWeekStart}
     shifts={shifts}
     employees={employees}
     selectedDate={selectedDate}
