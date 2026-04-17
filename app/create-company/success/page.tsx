@@ -1,4 +1,5 @@
 import Link from "next/link";
+import EmailConfirmationPolling from "../../../components/onboarding/EmailConfirmationPolling";
 import { resendOwnerConfirmation } from "./actions";
 
 type SuccessPageProps = {
@@ -37,6 +38,7 @@ export default async function CreateCompanySuccessPage({
             confirmation link to activate your workspace.
           </p>
         )}
+        <EmailConfirmationPolling enabled={!isExisting} ownerEmail={ownerEmail} />
 
         {!isExisting && ownerEmail ? (
           <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200">
