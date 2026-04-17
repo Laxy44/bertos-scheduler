@@ -4,7 +4,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "../../lib/supabase";
-import WeekNavigator from "../schedule/WeekNavigator";
 import ScheduleSection from "../schedule/ScheduleSection";
 import WeekSection from "../schedule/WeekSection";
 import MonthSection from "../month/MonthSection";
@@ -2620,22 +2619,11 @@ async function handleLogout() {
         )}
 
         {activeTab === "schedule" && (
-        <div className="mb-6 rounded-3xl bg-white p-4 shadow-sm">
-          <WeekNavigator
-            weekStart={weekStart}
-            goPrev={goToPreviousWeek}
-            goNext={goToNextWeek}
-            goToday={goToThisWeek}
-            setWeekStart={setWeekStart}
-            setSelectedDate={setSelectedDate}
-            setCopyFromDate={setCopyFromDate}
-            setForm={setForm}
-          />
-        </div>
-        )}
-
-        {activeTab === "schedule" && (
   <ScheduleSection
+    weekStart={weekStart}
+    goPrev={goToPreviousWeek}
+    goNext={goToNextWeek}
+    goToday={goToThisWeek}
     weekDates={weekDates}
     shifts={shifts}
     employees={employees}
