@@ -1213,10 +1213,15 @@ async function handleLogout() {
     );
   }
 
-  async function addEmployee() {
-    const trimmedName = newEmployeeForm.name.trim();
-    const hourlyRate = Number(newEmployeeForm.hourlyRate);
-    const trimmedRole = newEmployeeForm.defaultRole.trim() || "Service";
+  async function addEmployee(overrides?: {
+    name?: string;
+    hourlyRate?: number;
+    defaultRole?: string;
+  }) {
+    const trimmedName = (overrides?.name ?? newEmployeeForm.name).trim();
+    const hourlyRate = Number(overrides?.hourlyRate ?? newEmployeeForm.hourlyRate);
+    const trimmedRole =
+      (overrides?.defaultRole ?? newEmployeeForm.defaultRole).trim() || "Service";
 
     if (!activeCompanyId) {
       alert("No active company workspace found for this user.");

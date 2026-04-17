@@ -30,13 +30,15 @@ export default function EmployeesSection({
     firstName: "",
     surname: "",
     email: "",
-    role: "employee",
+    role: "Service",
     hourlyRate: "130",
     phone: "",
     visibleToOthers: false,
     birthday: "",
     hireDate: "",
     inviteToPlanyo: false,
+    /** App membership role for Supabase invite (not scheduling role). */
+    inviteAppRole: "employee" as "employee" | "admin",
     sendWelcome: false,
   });
 
@@ -70,26 +72,44 @@ export default function EmployeesSection({
       return;
     }
 
+    if (modalForm.inviteToPlanyo && !modalForm.email.trim()) {
+      setErrorMessage("Enter an email address to send a Planyo invite.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // Map rich form fields into the existing newEmployeeForm structure.
-      setNewEmployeeForm((current: any) => ({
-        ...current,
+      const defaultRole = modalForm.role || "Service";
+
+      // Pass payload directly so addEmployee does not rely on async parent state.
+      await addEmployee({
         name,
-        hourlyRate: String(hourlyRate),
-        defaultRole: modalForm.role || current.defaultRole,
-      }));
+        hourlyRate,
+        defaultRole,
+      });
 
-      // Reuse existing addEmployee logic (includes company_id + state updates).
-      await addEmployee();
-
-      // NOTE: Invite to Planyo is UI-only for now; wiring to the real invite
-      // flow should reuse the existing invite actions in /invites.
-      if (modalForm.inviteToPlanyo && modalForm.email.trim()) {
-        console.log("[employees] inviteToPlanyo checked for", modalForm.email.trim());
+      let inviteNote = "";
+      if (modalForm.inviteToPlanyo) {
+        const inviteEmail = modalForm.email.trim().toLowerCase();
+        const inviteRes = await fetch("/api/invites", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: inviteEmail,
+            role: modalForm.inviteAppRole,
+          }),
+        });
+        const inviteJson = (await inviteRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!inviteRes.ok) {
+          inviteNote = ` Invite email was not sent: ${inviteJson.error || inviteRes.statusText}.`;
+        } else {
+          inviteNote = " Invite email sent.";
+        }
       }
 
-      setStatusMessage("Employee added successfully.");
+      setStatusMessage(`Employee added successfully.${inviteNote}`);
       setModalForm((current) => ({
         ...current,
         firstName: "",
@@ -100,6 +120,7 @@ export default function EmployeesSection({
         birthday: "",
         hireDate: "",
         inviteToPlanyo: current.inviteToPlanyo,
+        inviteAppRole: current.inviteAppRole,
         sendWelcome: current.sendWelcome,
       }));
       setIsModalOpen(false);
@@ -323,8 +344,28 @@ export default function EmployeesSection({
                     }
                     className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
                   />
-                  <span>Invite to Planyo (uses this email when wired)</span>
+                  <span>Invite to Planyo (sends email to the address above)</span>
                 </label>
+                {modalForm.inviteToPlanyo ? (
+                  <div className="pl-7">
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                      Planyo access role
+                    </label>
+                    <select
+                      value={modalForm.inviteAppRole}
+                      onChange={(e) =>
+                        setModalForm((current) => ({
+                          ...current,
+                          inviteAppRole: e.target.value as "employee" | "admin",
+                        }))
+                      }
+                      className="w-full max-w-xs rounded-2xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                    >
+                      <option value="employee">Employee</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                ) : null}
                 <label className="inline-flex items-center gap-2 text-xs">
                   <input
                     type="checkbox"

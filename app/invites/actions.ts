@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 import { getSiteUrl } from "../../lib/site-url";
 import { sendEmployeeInviteEmail } from "../../lib/invite-email";
+import {
+  createPendingInviteAndSendEmail,
+  type AppInviteRole,
+} from "../../lib/employee-invite-flow";
 
 type ActiveMembership = {
   company_id: string | null;
@@ -15,8 +19,9 @@ export async function createInvite(formData: FormData) {
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const requestedRole = String(formData.get("role") || "employee").trim().toLowerCase();
   const allowedInviteRoles = new Set(["employee", "admin"]);
-  const role = allowedInviteRoles.has(requestedRole) ? requestedRole : "employee";
-  const origin = getSiteUrl();
+  const role = (
+    allowedInviteRoles.has(requestedRole) ? requestedRole : "employee"
+  ) as AppInviteRole;
 
   if (!email) {
     redirect("/invites?message=Employee email is required");
@@ -31,59 +36,19 @@ export async function createInvite(formData: FormData) {
     redirect("/login?message=Please log in to create invites");
   }
 
-  const membership = await supabase
-    .from("company_members")
-    .select("company_id, role")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .order("company_id", { ascending: true })
-    .limit(2);
-
-  if (membership.error || !(membership.data || []).length) {
-    redirect("/create-company?message=Create a company before inviting employees");
-  }
-
-  if ((membership.data || []).length > 1) {
-    redirect("/workspace-conflict");
-  }
-
-  const activeMembership = membership.data![0] as ActiveMembership;
-
-  const allowedRoles = new Set(["owner", "admin"]);
-  if (!allowedRoles.has((activeMembership.role || "").toLowerCase())) {
-    redirect("/invites?message=Only company owners or admins can create invites");
-  }
-
-  const existingPending = await supabase
-    .from("invites")
-    .select("id")
-    .eq("company_id", activeMembership.company_id)
-    .eq("email", email)
-    .eq("status", "pending")
-    .limit(1)
-    .maybeSingle<{ id: string }>();
-
-  if (!existingPending.error && existingPending.data?.id) {
-    redirect("/invites?message=Pending invite already exists for this email");
-  }
-
-  const inviteInsert = await supabase.from("invites").insert({
+  const result = await createPendingInviteAndSendEmail(supabase, user.id, {
     email,
-    company_id: activeMembership.company_id,
     role,
-    status: "pending",
   });
 
-  if (inviteInsert.error) {
-    redirect(`/invites?message=${encodeURIComponent(inviteInsert.error.message)}`);
-  }
-
-  const inviteEmail = await sendEmployeeInviteEmail(supabase, email, origin);
-
-  if (inviteEmail.error) {
-    redirect(
-      `/invites?message=Invite saved, but email failed: ${encodeURIComponent(inviteEmail.error.message)}`
-    );
+  if (!result.ok) {
+    if (result.error === "Workspace conflict") {
+      redirect("/workspace-conflict");
+    }
+    if (result.error.startsWith("Create a company")) {
+      redirect("/create-company?message=Create a company before inviting employees");
+    }
+    redirect(`/invites?message=${encodeURIComponent(result.error)}`);
   }
 
   redirect("/invites?message=Invite created and email sent");
