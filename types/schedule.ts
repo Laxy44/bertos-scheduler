@@ -36,4 +36,4 @@ export type NewEmployeeForm = {
   defaultRole: string;
 };
 
-export type AppTab = "schedule" | "week" | "month" | "payroll" | "employees";
+export type AppTab = "home" | "schedule" | "week" | "month" | "payroll" | "employees";

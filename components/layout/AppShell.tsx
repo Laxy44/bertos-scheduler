@@ -10,6 +10,7 @@ import WeekSection from "../schedule/WeekSection";
 import MonthSection from "../month/MonthSection";
 import PayrollSection from "../payroll/PayrollSection";
 import EmployeesSection from "../employees/EmployeesSection";
+import HomeDashboardSection, { type SetupCard } from "../dashboard/HomeDashboardSection";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -120,7 +121,7 @@ async function handleLogout() {
   const currentYear = new Date().getFullYear();
 
   
-  const [activeTab, setActiveTab] = useState<AppTab>("schedule");
+  const [activeTab, setActiveTab] = useState<AppTab>("home");
   const [employees, setEmployees] =
     useState<EmployeeConfig[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -1894,6 +1895,84 @@ async function handleLogout() {
     setActiveTab("employees");
   }
 
+  function openInviteTeamFromHome() {
+    router.push("/invites");
+  }
+
+  function openPayrollFromHome() {
+    setActiveTab("payroll");
+  }
+
+  const dashboardDisplayName = useMemo(() => {
+    const source = (employeeName || "").trim();
+    if (!source) return "there";
+    return source.split(/\s+/)[0] || source;
+  }, [employeeName]);
+
+  const hasEmployees = employees.length > 0;
+  const hasShifts = shifts.length > 0;
+  const hasApprovedShifts = shifts.some((shift) => shift.approved);
+  const hasRateConfigured = employees.some((employee) => employee.hourlyRate > 0);
+
+  const setupCards = useMemo<SetupCard[]>(
+    () => [
+      {
+        id: "team",
+        title: "Set up your team",
+        description: "Add your first employees and define default roles.",
+        status: hasEmployees ? "completed" : "not_started",
+        actionLabel: hasEmployees ? "Manage employees" : "Add employees",
+        onAction: openAddEmployeeFromHeader,
+      },
+      {
+        id: "schedule",
+        title: "Start scheduling",
+        description: "Create your first shift and plan this week.",
+        status: hasShifts ? "completed" : hasEmployees ? "in_progress" : "not_started",
+        actionLabel: hasShifts ? "Open schedule" : "Create first shift",
+        onAction: openCreateShiftFromHeader,
+      },
+      {
+        id: "payroll",
+        title: "Review payroll setup",
+        description: "Check rates, worked hours, and payroll visibility.",
+        status: hasApprovedShifts || (hasShifts && hasRateConfigured)
+          ? "completed"
+          : hasEmployees
+          ? "in_progress"
+          : "not_started",
+        actionLabel: "Review payroll",
+        onAction: openPayrollFromHome,
+      },
+      {
+        id: "invite",
+        title: "Invite your team",
+        description: "Send access invites so staff can view shifts and clock in/out.",
+        status: hasEmployees ? "in_progress" : "not_started",
+        actionLabel: "Invite team",
+        onAction: openInviteTeamFromHome,
+      },
+      {
+        id: "checks",
+        title: "Final checks",
+        description: "Confirm your team and schedule are ready for operations.",
+        status: hasEmployees && hasShifts ? "completed" : "not_started",
+        actionLabel: "Open schedule",
+        onAction: openCreateShiftFromHeader,
+      },
+    ],
+    [
+      hasApprovedShifts,
+      hasEmployees,
+      hasRateConfigured,
+      hasShifts,
+      openAddEmployeeFromHeader,
+      openCreateShiftFromHeader,
+      openInviteTeamFromHome,
+      openPayrollFromHome,
+    ]
+  );
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <datalist id="role-suggestions">
@@ -2094,6 +2173,7 @@ async function handleLogout() {
         {/* TOP NAVIGATION TABS */}
         <div className="mb-4 flex flex-wrap gap-2">
           {[
+  { key: "home", label: "Home" },
   { key: "schedule", label: "Schedule" },
   { key: "week", label: "Week View" },
   { key: "month", label: "Month View" },
@@ -2117,6 +2197,19 @@ async function handleLogout() {
             </button>
           ))}
         </div>
+
+        {activeTab === "home" && (
+          <HomeDashboardSection
+            displayName={dashboardDisplayName}
+            workspaceName={workspaceName}
+            setupCards={setupCards}
+            onAddEmployee={openAddEmployeeFromHeader}
+            onCreateShift={openCreateShiftFromHeader}
+            onInviteTeam={openInviteTeamFromHome}
+            onReviewPayroll={openPayrollFromHome}
+            showPayrollCta={isAdmin}
+          />
+        )}
 
         {activeTab === "schedule" && (
         <div className="mb-6 rounded-3xl bg-white p-4 shadow-sm">
