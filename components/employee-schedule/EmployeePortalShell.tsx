@@ -24,7 +24,7 @@ const navLinks: { href: string; label: string }[] = [
 ];
 
 /**
- * Compact workspace chrome for employee self-service routes (matches dark nav tone).
+ * Compact workspace chrome for member self-service routes (matches dark nav tone).
  */
 export default function EmployeePortalShell({
   displayName,
@@ -42,7 +42,7 @@ export default function EmployeePortalShell({
           <span className="max-w-[50%] truncate text-sm text-slate-300">{displayName}</span>
         </div>
         <nav
-          aria-label="Employee workspace"
+          aria-label="Member shortcuts"
           className="flex flex-wrap items-center gap-x-0.5 gap-y-1 border-t border-slate-800/80 px-2 py-2 xl:px-4"
         >
           {navLinks.map((item) => {

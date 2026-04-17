@@ -123,7 +123,7 @@ export default function EmployeeHomeSchedulePage({
         <div className="flex flex-col gap-1 border-b border-slate-200/80 pb-4">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Your schedule</h1>
           <p className="text-sm text-slate-600">
-            Personal, read-only overview. For the full workspace calendar, open{" "}
+            Your shifts only (read-only). For the company planner, open the{" "}
             <Link href="/" className="font-semibold text-indigo-700 underline-offset-2 hover:underline">
               dashboard
             </Link>{" "}

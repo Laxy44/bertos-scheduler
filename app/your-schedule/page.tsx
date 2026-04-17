@@ -2,14 +2,13 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import EmployeeHomeSchedulePage from "@/components/employee-schedule/EmployeeHomeSchedulePage";
 import { getLinkedProfileEmployee } from "@/lib/profile-employee";
-import { isCompanyAdminRole } from "@/lib/workspace-role";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getDayNameFromDate } from "@/lib/utils";
 import type { Shift } from "@/types/schedule";
 
 export const metadata: Metadata = {
   title: "Your schedule",
-  description: "Personal read-only schedule overview",
+  description: "Personal read-only schedule (your shifts only) for every workspace member",
 };
 
 type ProfileRow = {
@@ -81,16 +80,11 @@ export default async function YourSchedulePage() {
 
   const membership = membershipQuery.data?.[0] as CompanyMemberRow | undefined;
   const activeCompanyId = membership?.company_id ?? null;
-  const role = membership?.role ?? profile?.role ?? "employee";
   const companyRow = Array.isArray(membership?.companies) ? membership?.companies[0] : membership?.companies;
   const companyName = companyRow?.name ?? null;
 
   if (!activeCompanyId) {
     redirect("/create-company");
-  }
-
-  if (isCompanyAdminRole(role)) {
-    redirect("/");
   }
 
   const employeeRow = await getLinkedProfileEmployee(supabase, {
@@ -99,6 +93,7 @@ export default async function YourSchedulePage() {
     companyId: activeCompanyId,
   });
 
+  // Personal page for every company member: shifts match linked employee row name, then profile name.
   const employeeName = (employeeRow?.name || profile?.name || user.email || "").trim();
   const hourlyRate = Number(employeeRow?.hourly_rate ?? 0);
 
