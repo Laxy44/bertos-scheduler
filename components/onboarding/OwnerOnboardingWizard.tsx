@@ -178,6 +178,24 @@ export default function OwnerOnboardingWizard({
 
   return (
     <form action={formAction} className="mt-6 space-y-5" autoComplete="off">
+      {/* Autofill trap to reduce browser injecting remembered login credentials into step fields. */}
+      <input
+        type="text"
+        name="fake_username"
+        autoComplete="username"
+        tabIndex={-1}
+        className="hidden"
+        aria-hidden="true"
+      />
+      <input
+        type="password"
+        name="fake_password"
+        autoComplete="current-password"
+        tabIndex={-1}
+        className="hidden"
+        aria-hidden="true"
+      />
+
       <div className="grid grid-cols-3 gap-2">
         {STEPS.map((label, index) => {
           const isActive = index === step;
