@@ -2,8 +2,9 @@
 
 import { useRef, useState } from "react";
 import { AnchoredMenu } from "../ui/AnchoredMenu";
+import ScheduleViewNavigation from "./ScheduleViewNavigation";
 
-type ToolbarKey = "view" | "templates" | "tools" | "filters" | null;
+type ToolbarKey = "templates" | "tools" | "filters" | null;
 
 type ScheduleControlsBarProps = {
   goToday: () => void;
@@ -12,13 +13,12 @@ type ScheduleControlsBarProps = {
   weekRangeLabel: string;
 };
 
-const viewOptions = ["Day", "Week", "2 Weeks", "Month"];
 const templateOptions = ["Shift templates", "Saved patterns", "Import template"];
 const toolsOptions = ["Bulk actions", "Copy week", "Auto assign"];
 const filtersOptions = ["All shifts", "Unpublished", "Unassigned"];
 
 /**
- * LEVEL 2 — Planner controls (admin): week navigation + view / templates / tools / filters / publish.
+ * Admin planner row: shared view navigation + templates / tools / filters / publish.
  */
 export default function ScheduleControlsBar({
   goToday,
@@ -27,12 +27,10 @@ export default function ScheduleControlsBar({
   weekRangeLabel,
 }: ScheduleControlsBarProps) {
   const [openToolbarMenu, setOpenToolbarMenu] = useState<ToolbarKey>(null);
-  const [selectedViewLabel, setSelectedViewLabel] = useState("Week");
   const [selectedTemplateLabel, setSelectedTemplateLabel] = useState("Shift templates");
   const [selectedToolsLabel, setSelectedToolsLabel] = useState("Bulk actions");
   const [selectedFiltersLabel, setSelectedFiltersLabel] = useState("All shifts");
 
-  const viewAnchorRef = useRef<HTMLDivElement>(null);
   const templatesAnchorRef = useRef<HTMLDivElement>(null);
   const toolsAnchorRef = useRef<HTMLDivElement>(null);
   const filtersAnchorRef = useRef<HTMLDivElement>(null);
@@ -48,89 +46,12 @@ export default function ScheduleControlsBar({
   return (
     <div className="rounded-t-xl border border-b-0 border-slate-200 bg-white px-3 py-3 sm:px-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <div className="relative" ref={viewAnchorRef}>
-            <button
-              type="button"
-              onClick={() => toggleToolbarMenu("view")}
-              aria-haspopup="menu"
-              aria-expanded={openToolbarMenu === "view"}
-              className={`inline-flex min-w-[7.5rem] items-center justify-between rounded-md border px-2.5 py-1.5 text-sm font-semibold transition active:scale-[0.99] ${
-                openToolbarMenu === "view"
-                  ? "border-slate-300 bg-slate-50 text-slate-900"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <span>{selectedViewLabel}</span>
-              <span
-                className={`ml-2 text-xs text-slate-500 transition-transform duration-150 ${
-                  openToolbarMenu === "view" ? "rotate-180" : ""
-                }`}
-              >
-                ▾
-              </span>
-            </button>
-            <AnchoredMenu
-              open={openToolbarMenu === "view"}
-              onClose={closeToolbarMenus}
-              anchorRef={viewAnchorRef}
-              contentClassName="w-[180px]"
-            >
-              {viewOptions.map((option) => {
-                const isActive = selectedViewLabel === option;
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={isActive}
-                    onClick={() => {
-                      setSelectedViewLabel(option);
-                      closeToolbarMenus();
-                    }}
-                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                      isActive
-                        ? "bg-slate-100 font-semibold text-slate-900"
-                        : "font-medium text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    <span>{option}</span>
-                    <span
-                      className={`text-xs ${isActive ? "text-slate-700" : "text-transparent"}`}
-                    >
-                      ✓
-                    </span>
-                  </button>
-                );
-              })}
-            </AnchoredMenu>
-          </div>
-
-          <button
-            type="button"
-            onClick={goToday}
-            className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 active:scale-[0.99]"
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            onClick={goPrev}
-            className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 active:scale-[0.99]"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 active:scale-[0.99]"
-          >
-            →
-          </button>
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-slate-800 sm:text-sm">
-            {weekRangeLabel}
-          </div>
-        </div>
+        <ScheduleViewNavigation
+          goToday={goToday}
+          goPrev={goPrev}
+          goNext={goNext}
+          weekRangeLabel={weekRangeLabel}
+        />
 
         <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
           <button
