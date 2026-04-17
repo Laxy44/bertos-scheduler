@@ -128,8 +128,14 @@ async function handleLogout() {
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [isHomeMenuOpen, setIsHomeMenuOpen] = useState(false);
   const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
+  const [isPayrollMenuOpen, setIsPayrollMenuOpen] = useState(false);
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const homeMenuRef = useRef<HTMLDivElement | null>(null);
   const scheduleMenuRef = useRef<HTMLDivElement | null>(null);
+  const payrollMenuRef = useRef<HTMLDivElement | null>(null);
+  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
   async function fetchEmployees() {
@@ -207,6 +213,15 @@ async function handleLogout() {
       }
       if (scheduleMenuRef.current && !scheduleMenuRef.current.contains(target)) {
         setIsScheduleMenuOpen(false);
+      }
+      if (payrollMenuRef.current && !payrollMenuRef.current.contains(target)) {
+        setIsPayrollMenuOpen(false);
+      }
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(target)) {
+        setIsSettingsMenuOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setIsUserMenuOpen(false);
       }
     }
 
@@ -1928,30 +1943,87 @@ async function handleLogout() {
     setActiveTab(tab);
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
   }
 
   function openHomeMenuRoute(path: string) {
     router.push(path);
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
   }
 
   function openScheduleMenuTab(tab: AppTab) {
     setActiveTab(tab);
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
   }
 
   function openScheduleMenuRoute(path: string) {
     router.push(path);
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
+  }
+
+  function openPayrollMenuTab(tab: AppTab) {
+    setActiveTab(tab);
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
+  }
+
+  function openPayrollMenuRoute(path: string) {
+    router.push(path);
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
+  }
+
+  function openSettingsMenuRoute(path: string) {
+    router.push(path);
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
+  }
+
+  function openUserMenuRoute(path: string) {
+    router.push(path);
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+    setIsPayrollMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
   }
 
   const dashboardDisplayName = useMemo(() => {
     const source = (employeeName || "").trim();
     if (!source) return "there";
     return source.split(/\s+/)[0] || source;
+  }, [employeeName]);
+
+  const navUserLabel = useMemo(() => {
+    const source = (employeeName || "").trim();
+    if (!source || source.toLowerCase() === "unknown user") return "User";
+    if (source.includes("@")) {
+      return source.split("@")[0] || "User";
+    }
+    return source;
   }, [employeeName]);
 
   const hasEmployees = employees.length > 0;
@@ -2216,13 +2288,17 @@ async function handleLogout() {
         ) : null}
 
         {/* TOP NAVIGATION TABS */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          <div className="relative" ref={homeMenuRef}>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            <div className="relative" ref={homeMenuRef}>
             <button
               type="button"
               onClick={() => {
                 setIsHomeMenuOpen((current) => !current);
                 setIsScheduleMenuOpen(false);
+                setIsPayrollMenuOpen(false);
+                setIsSettingsMenuOpen(false);
+                setIsUserMenuOpen(false);
               }}
               className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                 activeTab === "home" || isHomeMenuOpen
@@ -2292,6 +2368,9 @@ async function handleLogout() {
               onClick={() => {
                 setIsScheduleMenuOpen((current) => !current);
                 setIsHomeMenuOpen(false);
+                setIsPayrollMenuOpen(false);
+                setIsSettingsMenuOpen(false);
+                setIsUserMenuOpen(false);
               }}
               className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                 activeTab === "schedule" || isScheduleMenuOpen
@@ -2355,12 +2434,115 @@ async function handleLogout() {
               </div>
             ) : null}
           </div>
+          {isAdmin ? (
+            <div className="relative" ref={payrollMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPayrollMenuOpen((current) => !current);
+                  setIsHomeMenuOpen(false);
+                  setIsScheduleMenuOpen(false);
+                  setIsSettingsMenuOpen(false);
+                  setIsUserMenuOpen(false);
+                }}
+                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                  activeTab === "payroll" || isPayrollMenuOpen
+                    ? "bg-slate-900 text-white"
+                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                Payroll <span className="ml-1 text-xs">▾</span>
+              </button>
+              {isPayrollMenuOpen ? (
+                <div className="absolute left-0 z-30 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => openPayrollMenuTab("payroll")}
+                    className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Payroll report
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openPayrollMenuRoute("/payroll/lock-date-range")}
+                    className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Lock date range for payroll
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openPayrollMenuRoute("/payroll/import-payslips")}
+                    className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Import payslips
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="relative" ref={settingsMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsSettingsMenuOpen((current) => !current);
+                setIsHomeMenuOpen(false);
+                setIsScheduleMenuOpen(false);
+                setIsPayrollMenuOpen(false);
+                setIsUserMenuOpen(false);
+              }}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                isSettingsMenuOpen
+                  ? "bg-slate-900 text-white"
+                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              Settings <span className="ml-1 text-xs">▾</span>
+            </button>
+            {isSettingsMenuOpen ? (
+              <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => openSettingsMenuRoute("/settings/workspace")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Workspace settings
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openSettingsMenuRoute("/settings/company")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Company details
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openSettingsMenuRoute("/settings/roles")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Roles & permissions
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openSettingsMenuRoute("/settings/notifications")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Notifications
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openSettingsMenuRoute("/settings/integrations")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Integrations
+                </button>
+              </div>
+            ) : null}
+          </div>
           {[
   { key: "week", label: "Week View" },
   { key: "month", label: "Month View" },
   ...(isAdmin
     ? [
-        { key: "payroll", label: "Payroll" },
         { key: "employees", label: "Employees" },
       ]
     : []),
@@ -2377,6 +2559,51 @@ async function handleLogout() {
               {tab.label}
             </button>
           ))}
+          </div>
+          <div className="relative" ref={userMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsUserMenuOpen((current) => !current);
+                setIsHomeMenuOpen(false);
+                setIsScheduleMenuOpen(false);
+                setIsPayrollMenuOpen(false);
+                setIsSettingsMenuOpen(false);
+              }}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                isUserMenuOpen
+                  ? "bg-slate-900 text-white"
+                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {navUserLabel} <span className="ml-1 text-xs">▾</span>
+            </button>
+            {isUserMenuOpen ? (
+              <div className="absolute right-0 z-30 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => openUserMenuRoute("/profile")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openUserMenuRoute("/account")}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Account
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Log out
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {activeTab === "home" && (
