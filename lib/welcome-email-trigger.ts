@@ -22,11 +22,7 @@ function extractFirstName(profile: ProfileRecord): string | null {
 }
 
 export async function maybeSendWelcomeEmailForUser(user: User): Promise<void> {
-  console.log("[WELCOME] Trigger started");
-  console.log("[WELCOME] User ID:", user.id);
-
   if (!user.id || !user.email || !user.email_confirmed_at) {
-    console.log("[WELCOME] Session/user check failed; skipping trigger.");
     return;
   }
 
@@ -84,9 +80,6 @@ export async function maybeSendWelcomeEmailForUser(user: User): Promise<void> {
     profile = profileReload.data;
   }
 
-  console.log("[WELCOME] Profile:", profile);
-  console.log("[WELCOME] welcome_email_sent:", profile?.welcome_email_sent);
-
   if (profile.welcome_email_sent) {
     return;
   }
@@ -115,17 +108,14 @@ export async function maybeSendWelcomeEmailForUser(user: User): Promise<void> {
   }
 
   try {
-    console.log("[WELCOME] Sending email...");
     await sendWelcomeEmail({
       to: user.email,
       firstName: extractFirstName(profile),
     });
-    console.log("[WELCOME] Email sent successfully");
     console.log("[welcome-email] sent", { userId: user.id, email: user.email });
   } catch (err) {
     // Revert claim on send failure so it can retry later.
     await admin.from("profiles").update({ welcome_email_sent: false }).eq("id", user.id);
-    console.error("[WELCOME ERROR]", err);
     console.warn("[welcome-email] send failed", {
       userId: user.id,
       email: user.email,
