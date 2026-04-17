@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { buildInviteEmailRedirectUrl } from "@/lib/auth-callback-urls";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";

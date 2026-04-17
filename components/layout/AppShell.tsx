@@ -1224,13 +1224,11 @@ async function handleLogout() {
       (overrides?.defaultRole ?? newEmployeeForm.defaultRole).trim() || "Service";
 
     if (!activeCompanyId) {
-      alert("No active company workspace found for this user.");
-      return;
+      throw new Error("No active company workspace found for this user.");
     }
 
     if (!trimmedName) {
-      alert("Please enter employee name.");
-      return;
+      throw new Error("Please enter employee name.");
     }
 
     const exists = employees.some(
@@ -1238,17 +1236,16 @@ async function handleLogout() {
     );
 
     if (exists) {
-      alert("Employee name already exists.");
-      return;
+      throw new Error("Employee name already exists.");
     }
 
     if (Number.isNaN(hourlyRate) || hourlyRate < 0) {
-      alert("Please enter a valid hourly rate.");
-      return;
+      throw new Error("Please enter a valid hourly rate.");
     }
 
     const response = await fetch("/api/employees", {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -1260,10 +1257,16 @@ async function handleLogout() {
       }),
     });
 
-    const result = await response.json();
+    let result: { error?: string; employee?: Record<string, unknown> };
+    try {
+      result = (await response.json()) as typeof result;
+    } catch {
+      throw new Error(
+        `Could not read server response (${response.status}). If this persists, check deployment logs.`
+      );
+    }
     if (!response.ok || !result?.employee) {
-      alert(result?.error || "Could not add employee.");
-      return;
+      throw new Error(result?.error || "Could not add employee.");
     }
     const data = result.employee;
 

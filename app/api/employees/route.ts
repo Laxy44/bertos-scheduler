@@ -50,7 +50,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const admin = createSupabaseAdminClient();
+  let admin;
+  try {
+    admin = createSupabaseAdminClient();
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      { error: message },
+      { status: 500 }
+    );
+  }
+
   const created = await admin
     .from("employees")
     .insert({

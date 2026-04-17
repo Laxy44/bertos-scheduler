@@ -128,7 +128,11 @@ export default function EmployeesSection({
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error creating employee:", error);
-      setErrorMessage("Failed to add employee. Please try again.");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to add employee. Please try again."
+      );
     } finally {
       setIsSubmitting(false);
     }
