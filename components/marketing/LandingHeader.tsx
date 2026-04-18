@@ -30,6 +30,12 @@ export default function LandingHeader({ isAuthenticated = false }: LandingHeader
           Planyo
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2" aria-label="Marketing">
+          <Link
+            href="/pricing"
+            className="rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition-colors duration-200 hover:text-slate-900"
+          >
+            Pricing
+          </Link>
           {isAuthenticated ? (
             <Link
               href="/app"
