@@ -48,8 +48,8 @@ import {
 import { isCompanyAdminRole } from "../../lib/workspace-role";
 import {
   addDays,
-  formatDKK,
   formatHours,
+  formatMoney,
   fromDateInputValue,
   getCurrentTimeString,
   getDayNameFromDate,
@@ -62,8 +62,9 @@ import {
   roleStyles,
   roundTime,
   sortEmployeesForDisplay,
-  startOfWeek,
+  startOfWeekWithPreference,
   toDateInputValue,
+  type WeekStartPreference,
 } from "../../lib/utils";
 
 
@@ -93,11 +94,15 @@ function createDefaultForm(date: string): FormState {
   };
 }
 
-const defaultNewEmployeeForm: NewEmployeeForm = {
-  name: "",
-  hourlyRate: "130",
-  defaultRole: "Service",
-};
+function createNewEmployeeForm(defaultHourlyWage: number | null | undefined): NewEmployeeForm {
+  const n = defaultHourlyWage != null ? Number(defaultHourlyWage) : NaN;
+  const hourlyRate = !Number.isNaN(n) && n >= 0 ? String(n) : "130";
+  return {
+    name: "",
+    hourlyRate,
+    defaultRole: "Service",
+  };
+}
 
 type AppShellProps = {
   role: string;
@@ -105,6 +110,10 @@ type AppShellProps = {
   companyName?: string | null;
   companyCvr?: string | null;
   activeCompanyId?: string | null;
+  /** Monday-first (default) or Sunday-first week for schedule + payroll week picker. */
+  companyWeekStartsOn?: "monday" | "sunday" | null;
+  companyCurrency?: string | null;
+  companyDefaultHourlyWage?: number | null;
 };
 
 export default function AppShell({
@@ -113,11 +122,18 @@ export default function AppShell({
   companyName,
   companyCvr,
   activeCompanyId,
+  companyWeekStartsOn,
+  companyCurrency,
+  companyDefaultHourlyWage,
 }: AppShellProps) {
   const normalizedRole = (role || "employee").toLowerCase();
   const isAdmin = isCompanyAdminRole(role);
   const workspaceName = companyName || "Workspace";
   const workspaceCvr = companyCvr || "";
+  const weekPref: WeekStartPreference =
+    (companyWeekStartsOn || "").toLowerCase() === "sunday" ? "sunday" : "monday";
+  const currencyCode = (companyCurrency || "DKK").trim().toUpperCase() || "DKK";
+  const formatCurrency = useCallback((n: number) => formatMoney(n, currencyCode), [currencyCode]);
   const supabase = createClient();
   const router = useRouter();
 
@@ -154,8 +170,8 @@ async function handleLogout() {
 
   const today = new Date();
   const todayDate = toDateInputValue(today);
-  const todayWeekStart = startOfWeek(today);
-  const initialWeekDates = getWeekDates(todayWeekStart);
+  const todayWeekStart = startOfWeekWithPreference(today, weekPref);
+  const initialWeekDates = getWeekDates(todayWeekStart, weekPref);
 
   const currentYear = new Date().getFullYear();
 
@@ -407,8 +423,8 @@ async function handleLogout() {
   const [availabilityDrafts, setAvailabilityDrafts] = useState<
     Record<string, string>
   >({});
-  const [newEmployeeForm, setNewEmployeeForm] = useState<NewEmployeeForm>(
-    defaultNewEmployeeForm
+  const [newEmployeeForm, setNewEmployeeForm] = useState<NewEmployeeForm>(() =>
+    createNewEmployeeForm(companyDefaultHourlyWage)
   );
   const [reportTimesheetFrom, setReportTimesheetFrom] = useState(() => {
     const { from } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
@@ -423,7 +439,9 @@ async function handleLogout() {
   const [payrollRangeMode, setPayrollRangeMode] = useState<"week" | "month" | "custom">("month");
   const [payrollOverviewMonth, setPayrollOverviewMonth] = useState(() => new Date().getMonth() + 1);
   const [payrollOverviewYear, setPayrollOverviewYear] = useState(currentYear);
-  const [payrollWeekStart, setPayrollWeekStart] = useState(() => startOfWeek(new Date()));
+  const [payrollWeekStart, setPayrollWeekStart] = useState(() =>
+    startOfWeekWithPreference(new Date(), weekPref)
+  );
   const [payrollCustomFrom, setPayrollCustomFrom] = useState(() => {
     const { from } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
     return from;
@@ -506,7 +524,7 @@ async function handleLogout() {
     );
   }, [employees, shifts]);
 
-  const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
+  const weekDates = useMemo(() => getWeekDates(weekStart, weekPref), [weekStart, weekPref]);
   const selectedDayName = useMemo(
     () => getDayNameFromDate(selectedDate),
     [selectedDate]
@@ -529,7 +547,7 @@ async function handleLogout() {
   useEffect(() => {
     const existsInWeek = weekDates.some((item) => item.date === selectedDate);
     if (!existsInWeek) {
-      const anchor = startOfWeek(fromDateInputValue(selectedDate));
+      const anchor = startOfWeekWithPreference(fromDateInputValue(selectedDate), weekPref);
       setWeekStart(anchor);
       setCopyFromDate(selectedDate);
       setForm((current) => ({
@@ -537,7 +555,7 @@ async function handleLogout() {
         date: selectedDate,
       }));
     }
-  }, [weekDates, selectedDate]);
+  }, [weekDates, selectedDate, weekPref]);
 
   useEffect(() => {
     const selectedEmployeeStillActive = activeEmployeeNames.includes(form.employee);
@@ -584,9 +602,9 @@ async function handleLogout() {
       setSelectedDate(date);
       setForm((current) => ({ ...current, date }));
       setOpenMenuId(null);
-      setWeekStart(startOfWeek(d));
+      setWeekStart(startOfWeekWithPreference(d, weekPref));
     },
-    [setForm, setOpenMenuId]
+    [setForm, setOpenMenuId, weekPref]
   );
 
   const selectedDateTotals = useMemo(() => {
@@ -1106,7 +1124,7 @@ async function handleLogout() {
     });
     setShiftRoleMode(roleSuggestions.includes(shift.role) ? "preset" : "custom");
     setSelectedDate(shift.date);
-    setWeekStart(startOfWeek(fromDateInputValue(shift.date)));
+    setWeekStart(startOfWeekWithPreference(fromDateInputValue(shift.date), weekPref));
   }
 
   async function deleteShift(id: string) {
@@ -1382,7 +1400,7 @@ async function handleLogout() {
   }
 
   function goToThisWeek() {
-    const newWeekStart = startOfWeek(new Date());
+    const newWeekStart = startOfWeekWithPreference(new Date(), weekPref);
     const newWeekDates = getWeekDates(newWeekStart);
     setWeekStart(newWeekStart);
     setSelectedDate(todayDate);
@@ -1884,7 +1902,7 @@ async function handleLogout() {
       }));
     }
 
-    setNewEmployeeForm(defaultNewEmployeeForm);
+    setNewEmployeeForm(createNewEmployeeForm(companyDefaultHourlyWage));
     setNewEmployeeRoleMode("preset");
   }
 
@@ -2047,7 +2065,7 @@ async function handleLogout() {
       ["From", from],
       ["To", to],
       [],
-      ["Employee", "Total hours", "Hourly rate (DKK)", "Total earnings (DKK)"],
+      ["Employee", "Total hours", `Hourly rate (${currencyCode})`, `Total earnings (${currencyCode})`],
       ...payrollOverviewRows.map((r) => [
         r.employee,
         r.totalHours.toFixed(2),
@@ -2103,10 +2121,10 @@ async function handleLogout() {
 
           <div class="summary">
             <p><strong>Total hours worked:</strong> ${payrollOverviewTotals.totalHours.toFixed(1)} hrs</p>
-            <p><strong>Total payroll cost:</strong> ${formatDKK(payrollOverviewTotals.totalPayrollCost)}</p>
+            <p><strong>Total payroll cost:</strong> ${formatCurrency(payrollOverviewTotals.totalPayrollCost)}</p>
             <p><strong>Average hourly cost:</strong> ${
               payrollOverviewTotals.totalHours > 0
-                ? formatDKK(payrollOverviewTotals.averageHourlyCost)
+                ? formatCurrency(payrollOverviewTotals.averageHourlyCost)
                 : "—"
             }</p>
           </div>
@@ -2116,7 +2134,7 @@ async function handleLogout() {
               <tr>
                 <th>Employee</th>
                 <th>Total hours</th>
-                <th>Hourly rate (DKK)</th>
+                <th>Hourly rate (${currencyCode})</th>
                 <th>Total earnings</th>
               </tr>
             </thead>
@@ -2164,8 +2182,8 @@ async function handleLogout() {
       "Start",
       "End",
       "Total hours",
-      "Hourly rate (DKK)",
-      "Total cost (DKK)",
+      `Hourly rate (${currencyCode})`,
+      `Total cost (${currencyCode})`,
     ];
     const body = timesheetReportFilteredShifts.map((shift) => {
       const rate = employeeRateMap[shift.employee] || 0;
@@ -2247,7 +2265,7 @@ async function handleLogout() {
             <thead>
               <tr>
                 <th>Employee</th><th>Date</th><th>Start</th><th>End</th>
-                <th>Total hours</th><th>Hourly rate</th><th>Total cost (DKK)</th>
+                <th>Total hours</th><th>Hourly rate</th><th>Total cost (${currencyCode})</th>
               </tr>
             </thead>
             <tbody>${rowsHtml}</tbody>
@@ -2392,7 +2410,7 @@ async function handleLogout() {
       '<p><strong>Total Planned Hours:</strong> ' + employeePeriodStats.planned.toFixed(1) + ' hrs</p>' +
       '<p><strong>Total Worked Hours:</strong> ' + employeePeriodStats.worked.toFixed(1) + ' hrs</p>' +
       '<p><strong>Total Approved Hours:</strong> ' + employeePeriodStats.approved.toFixed(1) + ' hrs</p>' +
-      '<p><strong>Approved Payroll Estimate:</strong> ' + formatDKK(approvedPayrollEstimate) + '</p>' +
+      '<p><strong>Approved Payroll Estimate:</strong> ' + formatCurrency(approvedPayrollEstimate) + '</p>' +
       '</div>' +
       '<table><thead><tr><th>Date</th><th>Day</th><th>Role</th><th>Planned</th><th>Planned Hours</th><th>Actual In</th><th>Actual Out</th><th>Worked Hours</th><th>Approved</th><th>Notes</th></tr></thead><tbody>' +
       rowsHtml +
@@ -2881,6 +2899,7 @@ async function handleLogout() {
 
         {activeTab === "schedule" && (
   <ScheduleSection
+    weekStartsOn={weekPref}
     weekStart={weekStart}
     setWeekStart={setWeekStart}
     shifts={shifts}
@@ -3010,7 +3029,7 @@ async function handleLogout() {
             onEmployeeFilterChange={setReportTimesheetEmployee}
             groupFilter={reportTimesheetGroup}
             onGroupFilterChange={setReportTimesheetGroup}
-            formatDKK={formatDKK}
+            formatDKK={formatCurrency}
             onExportCsv={downloadTimesheetsReportCsv}
             onExportPdf={downloadTimesheetsReportPdf}
           />
@@ -3040,7 +3059,8 @@ async function handleLogout() {
             totalHours={payrollOverviewTotals.totalHours}
             totalPayrollCost={payrollOverviewTotals.totalPayrollCost}
             averageHourlyCost={payrollOverviewTotals.averageHourlyCost}
-            formatDKK={formatDKK}
+            formatDKK={formatCurrency}
+            currencyCode={currencyCode}
             onRowClick={(name) => {
               setPayrollSelectedEmployee(name);
               setActiveTab("payroll-employee");
@@ -3058,7 +3078,8 @@ async function handleLogout() {
             totalHours={payrollEmployeeDetailTotals.totalHours}
             totalEarnings={payrollEmployeeDetailTotals.totalEarnings}
             shifts={payrollEmployeeDetailShifts}
-            formatDKK={formatDKK}
+            formatDKK={formatCurrency}
+            currencyCode={currencyCode}
             onBack={() => {
               setPayrollSelectedEmployee(null);
               setActiveTab("payroll-overview");

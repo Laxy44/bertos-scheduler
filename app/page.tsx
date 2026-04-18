@@ -17,10 +17,18 @@ type CompanyMemberRow = {
     | {
         name?: string | null;
         cvr?: string | null;
+        timezone?: string | null;
+        week_starts_on?: string | null;
+        currency?: string | null;
+        default_hourly_wage?: number | null;
       }
     | {
-    name?: string | null;
-    cvr?: string | null;
+        name?: string | null;
+        cvr?: string | null;
+        timezone?: string | null;
+        week_starts_on?: string | null;
+        currency?: string | null;
+        default_hourly_wage?: number | null;
       }[]
     | null;
 };
@@ -65,7 +73,11 @@ export default async function Page() {
         status,
         companies (
           name,
-          cvr
+          cvr,
+          timezone,
+          week_starts_on,
+          currency,
+          default_hourly_wage
         )
       `
     )
@@ -93,6 +105,12 @@ export default async function Page() {
     : membership?.companies;
   const companyName = companyRow?.name ?? null;
   const companyCvr = companyRow?.cvr ?? null;
+  const companyWeekStartsOn =
+    (companyRow?.week_starts_on || "monday").toLowerCase() === "sunday" ? "sunday" : "monday";
+  const companyCurrency = companyRow?.currency ?? null;
+  const rawWage = companyRow?.default_hourly_wage;
+  const companyDefaultHourlyWage =
+    rawWage != null && !Number.isNaN(Number(rawWage)) ? Number(rawWage) : null;
 
   if (!activeCompanyId) {
     redirect("/create-company");
@@ -111,6 +129,9 @@ export default async function Page() {
       companyName={companyName}
       companyCvr={companyCvr}
       activeCompanyId={activeCompanyId}
+      companyWeekStartsOn={companyWeekStartsOn}
+      companyCurrency={companyCurrency}
+      companyDefaultHourlyWage={companyDefaultHourlyWage}
     />
   );
 }

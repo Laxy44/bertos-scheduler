@@ -10,7 +10,15 @@ import {
   type ScheduleViewKind,
 } from "../../lib/schedule-view-utils";
 import { buildPlannerShiftHandlers } from "../../lib/schedule-planner-handlers";
-import { addDays, fromDateInputValue, getMonthCalendarDays, getWeekDates, startOfWeek, toDateInputValue } from "../../lib/utils";
+import {
+  addDays,
+  fromDateInputValue,
+  getMonthCalendarDays,
+  getWeekDates,
+  startOfWeekWithPreference,
+  toDateInputValue,
+  type WeekStartPreference,
+} from "../../lib/utils";
 import ScheduleBulkSelectionBar from "./ScheduleBulkSelectionBar";
 import ScheduleControls from "./ScheduleControls";
 import PlannerSubTabsRow from "./PlannerSubTabsRow";
@@ -64,6 +72,8 @@ export default function SchedulePage(props: any) {
     dayWorkedHours,
   } = props;
 
+  const weekStartsOn: WeekStartPreference = props.weekStartsOn ?? "monday";
+
   const safeSetWeekStart = setWeekStart ?? (() => {});
 
   const [scheduleView, setScheduleView] = useState<ScheduleViewKind>("week");
@@ -72,16 +82,17 @@ export default function SchedulePage(props: any) {
   const bulkBarRef = useRef<HTMLDivElement>(null);
   const [navigatorAnchor, setNavigatorAnchor] = useState<Date>(() => {
     const ws = props.weekStart instanceof Date ? props.weekStart : new Date(props.weekStart);
-    return startOfWeek(ws);
+    return startOfWeekWithPreference(ws, weekStartsOn);
   });
 
   useEffect(() => {
     if (scheduleView !== "week" && scheduleView !== "two_weeks") return;
-    const monday = startOfWeek(
-      props.weekStart instanceof Date ? props.weekStart : new Date(props.weekStart)
+    const anchor = startOfWeekWithPreference(
+      props.weekStart instanceof Date ? props.weekStart : new Date(props.weekStart),
+      weekStartsOn
     );
-    setNavigatorAnchor((prev) => (prev.getTime() === monday.getTime() ? prev : monday));
-  }, [props.weekStart, scheduleView]);
+    setNavigatorAnchor((prev) => (prev.getTime() === anchor.getTime() ? prev : anchor));
+  }, [props.weekStart, scheduleView, weekStartsOn]);
 
   useEffect(() => {
     if (scheduleView !== "day") return;
@@ -93,12 +104,12 @@ export default function SchedulePage(props: any) {
   const handleViewKindChange = useCallback(
     (next: ScheduleViewKind) => {
       const ref = fromDateInputValue(selectedDate);
-      const anchor = snapAnchorForView(next, ref);
+      const anchor = snapAnchorForView(next, ref, weekStartsOn);
       setNavigatorAnchor(anchor);
-      safeSetWeekStart(startOfWeek(ref));
+      safeSetWeekStart(startOfWeekWithPreference(ref, weekStartsOn));
       setScheduleView(next);
     },
-    [selectedDate, safeSetWeekStart]
+    [selectedDate, safeSetWeekStart, weekStartsOn]
   );
 
   const handleGoPrev = useCallback(() => {
@@ -106,7 +117,7 @@ export default function SchedulePage(props: any) {
       const d = addDays(navigatorAnchor, -1);
       setNavigatorAnchor(d);
       setSelectedDate(toDateInputValue(d));
-      safeSetWeekStart(startOfWeek(d));
+      safeSetWeekStart(startOfWeekWithPreference(d, weekStartsOn));
       return;
     }
     if (scheduleView === "week") {
@@ -125,16 +136,16 @@ export default function SchedulePage(props: any) {
     }
     const firstPrev = addCalendarMonthsFirst(navigatorAnchor, -1);
     setNavigatorAnchor(firstPrev);
-    safeSetWeekStart(startOfWeek(firstPrev));
+    safeSetWeekStart(startOfWeekWithPreference(firstPrev, weekStartsOn));
     setSelectedDate(toDateInputValue(firstPrev));
-  }, [navigatorAnchor, scheduleView, safeSetWeekStart, setSelectedDate]);
+  }, [navigatorAnchor, scheduleView, safeSetWeekStart, setSelectedDate, weekStartsOn]);
 
   const handleGoNext = useCallback(() => {
     if (scheduleView === "day") {
       const d = addDays(navigatorAnchor, 1);
       setNavigatorAnchor(d);
       setSelectedDate(toDateInputValue(d));
-      safeSetWeekStart(startOfWeek(d));
+      safeSetWeekStart(startOfWeekWithPreference(d, weekStartsOn));
       return;
     }
     if (scheduleView === "week") {
@@ -153,21 +164,21 @@ export default function SchedulePage(props: any) {
     }
     const firstNext = addCalendarMonthsFirst(navigatorAnchor, 1);
     setNavigatorAnchor(firstNext);
-    safeSetWeekStart(startOfWeek(firstNext));
+    safeSetWeekStart(startOfWeekWithPreference(firstNext, weekStartsOn));
     setSelectedDate(toDateInputValue(firstNext));
-  }, [navigatorAnchor, scheduleView, safeSetWeekStart, setSelectedDate]);
+  }, [navigatorAnchor, scheduleView, safeSetWeekStart, setSelectedDate, weekStartsOn]);
 
   const handleGoToday = useCallback(() => {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
     if (scheduleView === "day") {
       setNavigatorAnchor(t);
-      safeSetWeekStart(startOfWeek(t));
+      safeSetWeekStart(startOfWeekWithPreference(t, weekStartsOn));
       setSelectedDate(toDateInputValue(t));
       return;
     }
     if (scheduleView === "week" || scheduleView === "two_weeks") {
-      const w = startOfWeek(t);
+      const w = startOfWeekWithPreference(t, weekStartsOn);
       setNavigatorAnchor(w);
       safeSetWeekStart(w);
       setSelectedDate(toDateInputValue(t));
@@ -175,22 +186,25 @@ export default function SchedulePage(props: any) {
     }
     const first = new Date(t.getFullYear(), t.getMonth(), 1);
     setNavigatorAnchor(first);
-    safeSetWeekStart(startOfWeek(t));
+    safeSetWeekStart(startOfWeekWithPreference(t, weekStartsOn));
     setSelectedDate(toDateInputValue(t));
-  }, [scheduleView, safeSetWeekStart, setSelectedDate]);
+  }, [scheduleView, safeSetWeekStart, setSelectedDate, weekStartsOn]);
 
   const columnDates = useMemo(() => {
     if (scheduleView === "week") {
-      return getWeekDates(startOfWeek(navigatorAnchor));
+      return getWeekDates(startOfWeekWithPreference(navigatorAnchor, weekStartsOn), weekStartsOn);
     }
     if (scheduleView === "two_weeks") {
-      return getPlannerColumnDates(startOfWeek(navigatorAnchor), 14);
+      return getPlannerColumnDates(
+        startOfWeekWithPreference(navigatorAnchor, weekStartsOn),
+        14
+      );
     }
     if (scheduleView === "day") {
       return getPlannerColumnDates(navigatorAnchor, 1);
     }
-    return getWeekDates(startOfWeek(navigatorAnchor));
-  }, [scheduleView, navigatorAnchor]);
+    return getWeekDates(startOfWeekWithPreference(navigatorAnchor, weekStartsOn), weekStartsOn);
+  }, [scheduleView, navigatorAnchor, weekStartsOn]);
 
   const visibleDateSet = useMemo(() => {
     if (scheduleView === "month") {
@@ -251,7 +265,12 @@ export default function SchedulePage(props: any) {
     ]
   );
 
-  const weekRangeLabel = formatScheduleRangeLabel(scheduleView, navigatorAnchor, monthNames);
+  const weekRangeLabel = formatScheduleRangeLabel(
+    scheduleView,
+    navigatorAnchor,
+    monthNames,
+    weekStartsOn
+  );
 
   const visiblePeriodShifts = gridShifts.filter((shift: any) => visibleDateSet.has(shift.date));
 
@@ -282,12 +301,12 @@ export default function SchedulePage(props: any) {
     (date: string) => {
       const d = fromDateInputValue(date);
       setNavigatorAnchor(new Date(d.getFullYear(), d.getMonth(), 1));
-      safeSetWeekStart(startOfWeek(d));
+      safeSetWeekStart(startOfWeekWithPreference(d, weekStartsOn));
       setSelectedDate(date);
       setForm((current: any) => ({ ...current, date }));
       setOpenMenuId(null);
     },
-    [safeSetWeekStart, setSelectedDate, setForm, setOpenMenuId]
+    [safeSetWeekStart, setSelectedDate, setForm, setOpenMenuId, weekStartsOn]
   );
 
   const kpiCardClass = isReadOnly

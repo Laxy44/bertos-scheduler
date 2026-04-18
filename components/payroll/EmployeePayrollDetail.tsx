@@ -17,6 +17,7 @@ type EmployeePayrollDetailProps = {
   totalEarnings: number;
   shifts: Shift[];
   formatDKK: (n: number) => string;
+  currencyCode?: string;
   onBack: () => void;
 };
 
@@ -29,6 +30,7 @@ export default function EmployeePayrollDetail({
   totalEarnings,
   shifts,
   formatDKK,
+  currencyCode = "DKK",
   onBack,
 }: EmployeePayrollDetailProps) {
   return (
@@ -55,7 +57,9 @@ export default function EmployeePayrollDetail({
       <div className="grid gap-4 border-b border-slate-100 p-5 md:grid-cols-3 md:p-6">
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Hourly rate</p>
-          <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{hourlyRate.toFixed(2)} DKK</p>
+          <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+            {hourlyRate.toFixed(2)} {currencyCode}
+          </p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total hours</p>

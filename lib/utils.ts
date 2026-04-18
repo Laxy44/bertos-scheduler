@@ -1,4 +1,4 @@
-import { days, defaultEmployees, monthNames } from "./constants";
+import { defaultEmployees, monthNames } from "./constants";
 import type { EmployeeConfig, Shift } from "../types/schedule";
 
 export function toDateInputValue(date: Date) {
@@ -18,6 +18,20 @@ export function startOfWeek(date: Date) {
   const day = d.getDay();
   const diffToMonday = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diffToMonday);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+export type WeekStartPreference = "monday" | "sunday";
+
+/** Week anchor: Monday 00:00 or Sunday 00:00 local time. */
+export function startOfWeekWithPreference(date: Date, pref: WeekStartPreference): Date {
+  if (pref === "monday") {
+    return startOfWeek(date);
+  }
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() - day);
   d.setHours(0, 0, 0, 0);
   return d;
 }
@@ -43,8 +57,29 @@ export function getDayNameFromDate(value: string) {
   return map[day];
 }
 
-export function getWeekDates(weekStart: Date) {
-  return days.map((dayName, index) => {
+const weekDayLabelsMonday: readonly string[] = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+const weekDayLabelsSunday: readonly string[] = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+export function getWeekDates(weekStart: Date, pref: WeekStartPreference = "monday") {
+  const labels = pref === "monday" ? weekDayLabelsMonday : weekDayLabelsSunday;
+  return labels.map((dayName, index) => {
     const d = addDays(weekStart, index);
     return {
       dayName,
@@ -139,11 +174,19 @@ export function formatHours(value: number) {
   return `${value.toFixed(1)} hrs`;
 }
 
+export function formatMoney(value: number, currencyCode: string = "DKK") {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currencyCode,
+    }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currencyCode}`;
+  }
+}
+
 export function formatDKK(value: number) {
-  return new Intl.NumberFormat("en-DK", {
-    style: "currency",
-    currency: "DKK",
-  }).format(value);
+  return formatMoney(value, "DKK");
 }
 
 export function roundTime(time: string) {

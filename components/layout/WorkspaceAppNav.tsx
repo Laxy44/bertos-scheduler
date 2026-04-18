@@ -397,37 +397,9 @@ export default function WorkspaceAppNav({
                 <button
                   type="button"
                   className={menuItem}
-                  onClick={() => openSettingsMenuRoute("/settings/workspace")}
+                  onClick={() => openSettingsMenuRoute("/settings/general")}
                 >
-                  Workspace settings
-                </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openSettingsMenuRoute("/settings/company")}
-                >
-                  Company details
-                </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openSettingsMenuRoute("/settings/roles")}
-                >
-                  Roles & permissions
-                </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openSettingsMenuRoute("/settings/notifications")}
-                >
-                  Notifications
-                </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openSettingsMenuRoute("/settings/integrations")}
-                >
-                  Integrations
+                  Settings
                 </button>
               </>
             ) : (

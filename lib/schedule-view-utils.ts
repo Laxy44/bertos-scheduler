@@ -1,4 +1,4 @@
-import { addDays, startOfWeek, toDateInputValue } from "./utils";
+import { addDays, startOfWeekWithPreference, toDateInputValue, type WeekStartPreference } from "./utils";
 
 export type ScheduleViewKind = "day" | "week" | "two_weeks" | "month";
 
@@ -40,7 +40,8 @@ function formatDayMonthYear(d: Date, monthNames: readonly string[]) {
 export function formatScheduleRangeLabel(
   view: ScheduleViewKind,
   navigatorAnchor: Date,
-  monthNames: readonly string[]
+  monthNames: readonly string[],
+  weekPref: WeekStartPreference = "monday"
 ): string {
   const a = new Date(navigatorAnchor);
   a.setHours(0, 0, 0, 0);
@@ -50,13 +51,13 @@ export function formatScheduleRangeLabel(
   }
 
   if (view === "week") {
-    const start = startOfWeek(a);
+    const start = startOfWeekWithPreference(a, weekPref);
     const end = addDays(start, 6);
     return `${formatDayMonthYear(start, monthNames)} – ${formatDayMonthYear(end, monthNames)}`;
   }
 
   if (view === "two_weeks") {
-    const start = startOfWeek(a);
+    const start = startOfWeekWithPreference(a, weekPref);
     const end = addDays(start, 13);
     return `${formatDayMonthYear(start, monthNames)} – ${formatDayMonthYear(end, monthNames)}`;
   }
@@ -73,10 +74,14 @@ export function labelFromViewKind(kind: ScheduleViewKind): string {
   return "Month";
 }
 
-export function snapAnchorForView(kind: ScheduleViewKind, reference: Date): Date {
+export function snapAnchorForView(
+  kind: ScheduleViewKind,
+  reference: Date,
+  weekPref: WeekStartPreference = "monday"
+): Date {
   const r = new Date(reference);
   r.setHours(0, 0, 0, 0);
   if (kind === "day") return r;
-  if (kind === "week" || kind === "two_weeks") return startOfWeek(r);
+  if (kind === "week" || kind === "two_weeks") return startOfWeekWithPreference(r, weekPref);
   return startOfMonth(r);
 }

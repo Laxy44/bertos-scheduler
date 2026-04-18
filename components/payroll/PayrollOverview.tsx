@@ -35,6 +35,8 @@ type PayrollOverviewProps = {
   totalPayrollCost: number;
   averageHourlyCost: number;
   formatDKK: (n: number) => string;
+  /** ISO 4217 code for rate labels (e.g. DKK). */
+  currencyCode?: string;
   onRowClick: (employeeName: string) => void;
   onExportCsv: () => void;
   onExportPdf: () => void;
@@ -65,6 +67,7 @@ export default function PayrollOverview({
   totalPayrollCost,
   averageHourlyCost,
   formatDKK,
+  currencyCode = "DKK",
   onRowClick,
   onExportCsv,
   onExportPdf,
@@ -281,7 +284,9 @@ export default function PayrollOverview({
                         </span>
                       </td>
                       <td className="px-3 py-2.5 tabular-nums text-slate-700">{row.totalHours.toFixed(2)}</td>
-                      <td className="px-3 py-2.5 tabular-nums text-slate-700">{row.hourlyRate.toFixed(2)} DKK</td>
+                      <td className="px-3 py-2.5 tabular-nums text-slate-700">
+                        {row.hourlyRate.toFixed(2)} {currencyCode}
+                      </td>
                       <td className="px-3 py-2.5 font-medium tabular-nums text-slate-900">
                         {formatDKK(row.totalEarnings)}
                       </td>
