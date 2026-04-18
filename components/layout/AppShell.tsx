@@ -199,11 +199,15 @@ export default function AppShell({
     await loadEmployeeGroups();
   }, [activeCompanyId, isAdmin, loadEmployeeGroups, supabase]);
 
-async function handleLogout() {
-  await supabase.auth.signOut();
-  router.push("/login");
-  router.refresh();
-}
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    // Single full navigation: clears RSC cache without an extra refresh round-trip.
+    if (typeof window !== "undefined") {
+      window.location.replace("/login");
+    } else {
+      router.replace("/login");
+    }
+  }
 
   const today = new Date();
   const todayDate = toDateInputValue(today);
@@ -801,21 +805,28 @@ async function handleLogout() {
       (sum, shift) => sum + getPlannedHours(shift),
       0
     );
-  }, [filteredShifts]);
+  }, [filteredShifts, getPlannedHours]);
 
   const dayWorkedHours = useMemo(() => {
     return filteredShifts.reduce((sum, shift) => sum + getWorkedHours(shift), 0);
-  }, [filteredShifts]);
+  }, [filteredShifts, getWorkedHours]);
 
   const weeklyOverview = useMemo(() => {
     const result: Record<string, Record<string, Shift[]>> = {};
-    for (const employee of employeeNames) {
-      result[employee] = {};
+    const dateSet = new Set(weekDates.map((item) => item.date));
+    for (const name of employeeNames) {
+      const row: Record<string, Shift[]> = {};
       for (const item of weekDates) {
-        result[employee][item.date] = shifts.filter(
-          (shift) => shift.employee === employee && shift.date === item.date
-        );
+        row[item.date] = [];
       }
+      result[name] = row;
+    }
+    for (const shift of shifts) {
+      if (!dateSet.has(shift.date)) continue;
+      const row = result[shift.employee];
+      if (!row) continue;
+      const cell = row[shift.date];
+      if (cell) cell.push(shift);
     }
     return result;
   }, [shifts, weekDates, employeeNames]);
@@ -826,9 +837,9 @@ async function handleLogout() {
       totals[employee] = { planned: 0, worked: 0 };
     }
 
+    const dateSet = new Set(weekDates.map((item) => item.date));
     shifts.forEach((shift) => {
-      const inCurrentWeek = weekDates.some((item) => item.date === shift.date);
-      if (!inCurrentWeek) return;
+      if (!dateSet.has(shift.date)) return;
 
       if (!totals[shift.employee]) {
         totals[shift.employee] = { planned: 0, worked: 0 };
@@ -839,7 +850,7 @@ async function handleLogout() {
     });
 
     return totals;
-  }, [shifts, weekDates, employeeNames]);
+  }, [shifts, weekDates, employeeNames, getPlannedHours, getWorkedHours]);
 
   const monthlyHours = useMemo(() => {
     const totals: Record<string, { planned: number; worked: number }> = {};
@@ -3176,6 +3187,7 @@ async function handleLogout() {
     weekStartsOn={weekPref}
     weekStart={weekStart}
     setWeekStart={setWeekStart}
+    scheduleGridEmployees={scheduleGridEmployees}
     shifts={shifts}
     employees={employees}
     selectedDate={selectedDate}

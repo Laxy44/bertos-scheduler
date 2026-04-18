@@ -1,6 +1,7 @@
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import AppShell from "../components/layout/AppShell";
-import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
+import { getCachedWorkspaceForUser } from "@/lib/cached-workspace-load";
 import { getLinkedProfileEmployee } from "@/lib/profile-employee";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { maybeSendWelcomeEmailForUser } from "../lib/welcome-email-trigger";
@@ -34,16 +35,16 @@ export default async function Page({ searchParams }: PageProps) {
     redirect("/login");
   }
 
-  // First authenticated load hook: sends welcome email once after confirmed email.
-  await maybeSendWelcomeEmailForUser(user);
+  const [profileQuery, workspace] = await Promise.all([
+    supabase.from("profiles").select("role, name").eq("id", user.id).maybeSingle(),
+    getCachedWorkspaceForUser(user.id),
+  ]);
 
   let profile: ProfileRow | null = null;
-  const profileQuery = await supabase.from("profiles").select("role, name").eq("id", user.id).maybeSingle();
   if (!profileQuery.error) {
     profile = profileQuery.data;
   }
 
-  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
   if (workspace.kind === "conflict") {
     redirect("/workspace-conflict");
   }
@@ -52,6 +53,16 @@ export default async function Page({ searchParams }: PageProps) {
   }
 
   const { membership, company } = workspace;
+  // Do not block first paint on welcome email (network) or invite link-up (admin round-trips).
+  after(() => void maybeSendWelcomeEmailForUser(user));
+  after(() =>
+    void getLinkedProfileEmployee(supabase, {
+      userId: user.id,
+      authEmail: user.email ?? null,
+      companyId: membership.company_id,
+    })
+  );
+
   const role = membership.role ?? profile?.role ?? "employee";
   const employeeName = profile?.name ?? user.email ?? "Unknown user";
   const activeCompanyId = membership.company_id;
@@ -63,12 +74,6 @@ export default async function Page({ searchParams }: PageProps) {
   const rawWage = company?.default_hourly_wage;
   const companyDefaultHourlyWage =
     rawWage != null && !Number.isNaN(Number(rawWage)) ? Number(rawWage) : null;
-
-  await getLinkedProfileEmployee(supabase, {
-    userId: user.id,
-    authEmail: user.email ?? null,
-    companyId: activeCompanyId,
-  });
 
   return (
     <AppShell

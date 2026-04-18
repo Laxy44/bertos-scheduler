@@ -72,13 +72,18 @@ export default function ScheduleGrid({
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
-  const visibleDateSet = new Set(columnDates.map((item: any) => item.date));
-  const visiblePeriodShifts = shifts.filter((shift: any) => visibleDateSet.has(shift.date));
-
-  const dayShiftCountMap = columnDates.reduce((acc: Record<string, number>, item: any) => {
-    acc[item.date] = shifts.filter((shift: any) => shift.date === item.date).length;
-    return acc;
-  }, {});
+  const { visibleDateSet, visiblePeriodShifts, dayShiftCountMap } = useMemo(() => {
+    const dates = columnDates.map((item: any) => item.date);
+    const set = new Set(dates);
+    const periodShifts = shifts.filter((shift: any) => set.has(shift.date));
+    const counts: Record<string, number> = Object.fromEntries(dates.map((d) => [d, 0]));
+    for (const shift of shifts) {
+      if (set.has(shift.date)) {
+        counts[shift.date] = (counts[shift.date] ?? 0) + 1;
+      }
+    }
+    return { visibleDateSet: set, visiblePeriodShifts: periodShifts, dayShiftCountMap: counts };
+  }, [columnDates, shifts]);
 
   const getShiftStatusLabel = (shift: any) => {
     if (shift.approved) return "Approved";

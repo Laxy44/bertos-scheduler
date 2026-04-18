@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import YourAvailabilityClient from "@/components/availability/YourAvailabilityClient";
-import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
+import { getCachedWorkspaceForUser } from "@/lib/cached-workspace-load";
 import { getLinkedProfileEmployee } from "@/lib/profile-employee";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -25,13 +25,16 @@ export default async function YourAvailabilityPage() {
     redirect("/login");
   }
 
+  const [profileQuery, workspace] = await Promise.all([
+    supabase.from("profiles").select("name").eq("id", user.id).maybeSingle(),
+    getCachedWorkspaceForUser(user.id),
+  ]);
+
   let profile: ProfileRow | null = null;
-  const profileQuery = await supabase.from("profiles").select("name").eq("id", user.id).maybeSingle();
   if (!profileQuery.error) {
     profile = profileQuery.data;
   }
 
-  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
   if (workspace.kind === "conflict") {
     redirect("/workspace-conflict");
   }

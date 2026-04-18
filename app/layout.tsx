@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
+import { Suspense } from "react";
+import AppNavigateFallback from "@/components/ui/AppNavigateFallback";
 import { AuthEmailHashForward } from "./auth-email-hash-forward";
 import "./globals.css";
 
@@ -34,7 +36,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <AuthEmailHashForward />
-        {children}
+        <Suspense fallback={<AppNavigateFallback />}>{children}</Suspense>
       </body>
     </html>
   );

@@ -2,8 +2,10 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { authDebug } from "./lib/auth-debug";
+import { WORKSPACE_PROXY_COMPANY_HEADER } from "./lib/workspace-request-hint";
 
 export async function proxy(request: NextRequest) {
+  let proxyWorkspaceCompanyId: string | null = null;
   const { pathname, searchParams } = request.nextUrl;
   const loginMode = searchParams.get("mode");
   const isRecoveryMode = pathname === "/login" && loginMode === "recovery";
@@ -164,6 +166,20 @@ export async function proxy(request: NextRequest) {
       });
       return NextResponse.redirect(homeUrl);
     }
+
+    if (activeMemberships.length === 1 && activeMemberships[0]?.company_id) {
+      proxyWorkspaceCompanyId = activeMemberships[0].company_id as string;
+    }
+  }
+
+  if (proxyWorkspaceCompanyId) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set(WORKSPACE_PROXY_COMPANY_HEADER, proxyWorkspaceCompanyId);
+    const withHint = NextResponse.next({ request: { headers: requestHeaders } });
+    response.cookies.getAll().forEach((cookie) => {
+      withHint.cookies.set(cookie.name, cookie.value);
+    });
+    return withHint;
   }
 
   return response;

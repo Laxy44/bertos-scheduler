@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authDebug } from "@/lib/auth-debug";
+import { parseProxyCompanyIdHint } from "@/lib/workspace-request-hint";
 
 /** Active membership row (no embedded join — avoids RLS failures on nested `companies`). */
 export type ActiveMembershipCore = {
@@ -29,32 +30,71 @@ export type ActiveMembershipLoadResult =
  * Nested selects can error or empty under RLS while `company_id` is still readable,
  * which previously caused `/` ↔ `/create-company` redirect loops with `proxy.ts`.
  */
+export type LoadActiveMembershipOptions = {
+  /** When set (e.g. from proxy), verify this row instead of listing all memberships first. */
+  proxyCompanyIdHint?: string | null;
+};
+
 export async function loadActiveMembershipAndCompany(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  options?: LoadActiveMembershipOptions
 ): Promise<ActiveMembershipLoadResult> {
-  const base = await supabase
-    .from("company_members")
-    .select("company_id, role, status")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .order("company_id", { ascending: true })
-    .limit(2);
+  const hint = parseProxyCompanyIdHint(options?.proxyCompanyIdHint ?? null);
 
-  if (base.error) {
-    authDebug("active-membership base query", {
-      userId,
-      error: base.error.message,
-    });
-    return { kind: "none" };
+  let row: { company_id?: string | null; role?: string | null; status?: string | null } | undefined;
+
+  if (hint) {
+    const verified = await supabase
+      .from("company_members")
+      .select("company_id, role, status")
+      .eq("user_id", userId)
+      .eq("company_id", hint)
+      .eq("status", "active")
+      .maybeSingle<{
+        company_id: string | null;
+        role: string | null;
+        status: string | null;
+      }>();
+
+    if (!verified.error && verified.data?.company_id) {
+      row = verified.data;
+    } else {
+      authDebug("active-membership hint fallback", {
+        userId,
+        hint,
+        error: verified.error?.message,
+      });
+    }
   }
 
-  const rows = base.data || [];
-  if (rows.length > 1) {
-    return { kind: "conflict" };
+  if (!row) {
+    const base = await supabase
+      .from("company_members")
+      .select("company_id, role, status")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .order("company_id", { ascending: true })
+      .limit(2);
+
+    if (base.error) {
+      authDebug("active-membership base query", {
+        userId,
+        error: base.error.message,
+      });
+      return { kind: "none" };
+    }
+
+    const rows = base.data || [];
+    if (rows.length > 1) {
+      return { kind: "conflict" };
+    }
+
+    row = rows[0] as
+      | { company_id?: string | null; role?: string | null; status?: string | null }
+      | undefined;
   }
 
-  const row = rows[0] as { company_id?: string | null; role?: string | null; status?: string | null } | undefined;
   const companyId = row?.company_id;
   if (!companyId) {
     return { kind: "none" };

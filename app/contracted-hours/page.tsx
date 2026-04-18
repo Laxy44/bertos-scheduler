@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import ContractedHoursClient from "@/components/contracted-hours/ContractedHoursClient";
-import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
+import { getCachedWorkspaceForUser } from "@/lib/cached-workspace-load";
 import { isCompanyAdminRole } from "@/lib/workspace-role";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { addDays, getDayNameFromDate, startOfWeek, toDateInputValue } from "@/lib/utils";
@@ -39,7 +39,7 @@ export default async function ContractedHoursPage() {
     redirect("/login");
   }
 
-  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
+  const workspace = await getCachedWorkspaceForUser(user.id);
   if (workspace.kind === "conflict") {
     redirect("/workspace-conflict");
   }
@@ -55,36 +55,39 @@ export default async function ContractedHoursPage() {
     redirect("/your-schedule");
   }
 
-  const { data: empRows, error: empError } = await supabase
-    .from("employees")
-    .select("name, active")
-    .eq("company_id", activeCompanyId)
-    .order("name", { ascending: true });
-
-  if (empError) {
-    redirect("/");
-  }
-
-  const employees = (empRows || []).map((r) => ({
-    name: String(r.name),
-    active: Boolean(r.active),
-  }));
-
   const ws = startOfWeek(new Date());
   const from = toDateInputValue(ws);
   const to = toDateInputValue(addDays(ws, 6));
 
-  const { data: shiftRows, error: shiftError } = await supabase
-    .from("shifts")
-    .select("*")
-    .eq("company_id", activeCompanyId)
-    .gte("date", from)
-    .lte("date", to)
-    .order("date", { ascending: true })
-    .order("start", { ascending: true });
+  const [empResult, shiftResult] = await Promise.all([
+    supabase
+      .from("employees")
+      .select("name, active")
+      .eq("company_id", activeCompanyId)
+      .order("name", { ascending: true }),
+    supabase
+      .from("shifts")
+      .select("*")
+      .eq("company_id", activeCompanyId)
+      .gte("date", from)
+      .lte("date", to)
+      .order("date", { ascending: true })
+      .order("start", { ascending: true }),
+  ]);
+
+  if (empResult.error) {
+    redirect("/");
+  }
+
+  const employees = (empResult.data || []).map((r) => ({
+    name: String(r.name),
+    active: Boolean(r.active),
+  }));
 
   const shiftsThisWeek: Shift[] =
-    !shiftError && shiftRows ? shiftRows.map((row) => mapRowToShift(row as Record<string, unknown>)) : [];
+    !shiftResult.error && shiftResult.data
+      ? shiftResult.data.map((row) => mapRowToShift(row as Record<string, unknown>))
+      : [];
 
   return (
     <ContractedHoursClient

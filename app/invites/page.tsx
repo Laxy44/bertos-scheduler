@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
+import { getCachedWorkspaceForUser } from "@/lib/cached-workspace-load";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 import { cancelInvite, createInvite, resendInvite } from "./actions";
 
@@ -28,7 +28,7 @@ export default async function InvitesPage({
     redirect("/login?message=Please log in to manage invites");
   }
 
-  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
+  const workspace = await getCachedWorkspaceForUser(user.id);
   if (workspace.kind === "conflict") {
     redirect("/workspace-conflict");
   }

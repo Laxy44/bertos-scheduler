@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
+import { getCachedWorkspaceForUser } from "@/lib/cached-workspace-load";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isCompanyAdminRole } from "@/lib/workspace-role";
 
@@ -37,7 +37,7 @@ export async function requireSettingsAdmin(): Promise<SettingsAdminContext> {
     redirect("/login?message=Please log in to open settings");
   }
 
-  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
+  const workspace = await getCachedWorkspaceForUser(user.id);
   if (workspace.kind === "conflict") {
     redirect("/workspace-conflict");
   }

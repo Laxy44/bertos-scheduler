@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import ProfileForm from "@/components/profile/ProfileForm";
-import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
+import { getCachedWorkspaceForUser } from "@/lib/cached-workspace-load";
 import { getLinkedProfileEmployee, mapEmployeeRowToView } from "@/lib/profile-employee";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -18,7 +18,7 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
+  const workspace = await getCachedWorkspaceForUser(user.id);
   if (workspace.kind === "conflict") {
     redirect("/workspace-conflict");
   }

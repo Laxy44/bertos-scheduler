@@ -70,6 +70,7 @@ export default function SchedulePage(props: any) {
     onAddEmployeeCta,
     dayHours,
     dayWorkedHours,
+    scheduleGridEmployees: scheduleGridEmployeesFromParent,
   } = props;
 
   const weekStartsOn: WeekStartPreference = props.weekStartsOn ?? "monday";
@@ -222,12 +223,59 @@ export default function SchedulePage(props: any) {
     return shifts.filter((s: any) => s.employee === self);
   }, [isReadOnly, shifts, employeeName]);
 
-  const scheduleGridEmployees =
-    employeeFilter === "All"
-      ? employeeNames.filter((name: string) =>
-          employees.some((employee: any) => employee.name === name && employee.active)
-        )
-      : employeeNames.filter((name: string) => name === employeeFilter);
+  const scheduleGridEmployees = useMemo(
+    () =>
+      scheduleGridEmployeesFromParent ??
+      (employeeFilter === "All"
+        ? employeeNames.filter((name: string) =>
+            employees.some((employee: any) => employee.name === name && employee.active)
+          )
+        : employeeNames.filter((name: string) => name === employeeFilter)),
+    [scheduleGridEmployeesFromParent, employeeFilter, employeeNames, employees]
+  );
+
+  const weekRangeLabel = useMemo(
+    () => formatScheduleRangeLabel(scheduleView, navigatorAnchor, monthNames, weekStartsOn),
+    [scheduleView, navigatorAnchor, monthNames, weekStartsOn]
+  );
+
+  const visiblePeriodShifts = useMemo(
+    () => gridShifts.filter((shift: any) => visibleDateSet.has(shift.date)),
+    [gridShifts, visibleDateSet]
+  );
+
+  const employeeRateByName = useMemo(
+    () =>
+      employees.reduce((acc: Record<string, number>, employee: any) => {
+        acc[employee.name] = Number(employee.hourlyRate || 0);
+        return acc;
+      }, {}),
+    [employees]
+  );
+
+  const { weeklyPlannedHours, weeklyWorkedHours, weeklyPlannedPayroll, weeklyWorkedPayroll } =
+    useMemo(() => {
+      const weeklyPlannedHoursInner = visiblePeriodShifts.reduce(
+        (sum: number, shift: any) => sum + getPlannedHours(shift),
+        0
+      );
+      const weeklyWorkedHoursInner = visiblePeriodShifts.reduce(
+        (sum: number, shift: any) => sum + getWorkedHours(shift),
+        0
+      );
+      const weeklyPlannedPayrollInner = visiblePeriodShifts.reduce((sum: number, shift: any) => {
+        return sum + getPlannedHours(shift) * (employeeRateByName[shift.employee] || 0);
+      }, 0);
+      const weeklyWorkedPayrollInner = visiblePeriodShifts.reduce((sum: number, shift: any) => {
+        return sum + getWorkedHours(shift) * (employeeRateByName[shift.employee] || 0);
+      }, 0);
+      return {
+        weeklyPlannedHours: weeklyPlannedHoursInner,
+        weeklyWorkedHours: weeklyWorkedHoursInner,
+        weeklyPlannedPayroll: weeklyPlannedPayrollInner,
+        weeklyWorkedPayroll: weeklyWorkedPayrollInner,
+      };
+    }, [visiblePeriodShifts, employeeRateByName, getPlannedHours, getWorkedHours]);
 
   const { openQuickAddForCell, openShiftFromGrid, onEmptyMonthDayQuickAdd } = useMemo(
     () =>
@@ -264,35 +312,6 @@ export default function SchedulePage(props: any) {
       onCreateShiftCta,
     ]
   );
-
-  const weekRangeLabel = formatScheduleRangeLabel(
-    scheduleView,
-    navigatorAnchor,
-    monthNames,
-    weekStartsOn
-  );
-
-  const visiblePeriodShifts = gridShifts.filter((shift: any) => visibleDateSet.has(shift.date));
-
-  const employeeRateByName = employees.reduce((acc: Record<string, number>, employee: any) => {
-    acc[employee.name] = Number(employee.hourlyRate || 0);
-    return acc;
-  }, {});
-
-  const weeklyPlannedHours = visiblePeriodShifts.reduce(
-    (sum: number, shift: any) => sum + getPlannedHours(shift),
-    0
-  );
-  const weeklyWorkedHours = visiblePeriodShifts.reduce(
-    (sum: number, shift: any) => sum + getWorkedHours(shift),
-    0
-  );
-  const weeklyPlannedPayroll = visiblePeriodShifts.reduce((sum: number, shift: any) => {
-    return sum + getPlannedHours(shift) * (employeeRateByName[shift.employee] || 0);
-  }, 0);
-  const weeklyWorkedPayroll = visiblePeriodShifts.reduce((sum: number, shift: any) => {
-    return sum + getWorkedHours(shift) * (employeeRateByName[shift.employee] || 0);
-  }, 0);
 
   const self = (employeeName || "").trim();
   const isOwnShift = (shift: any) => Boolean(self) && shift.employee === self;
