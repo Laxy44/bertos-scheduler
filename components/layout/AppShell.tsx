@@ -10,15 +10,18 @@ import WorkspaceAppNav from "./WorkspaceAppNav";
 import WeekSection from "../schedule/WeekSection";
 import MonthSection from "../month/MonthSection";
 import TimesheetsReport from "../reports/TimesheetsReport";
-import PayrollSummaryReport, {
-  type PayrollSummaryRow,
-} from "../reports/PayrollSummaryReport";
+import PayrollOverview, { type PayrollOverviewRow } from "../payroll/PayrollOverview";
+import EmployeePayrollDetail from "../payroll/EmployeePayrollDetail";
 import { calendarMonthRange } from "../../lib/reports/date-range";
 import {
   reportEndDisplay,
   reportHoursForShift,
   reportStartDisplay,
 } from "../../lib/reports/shift-hours-cost";
+import {
+  earningsForShift,
+  hoursForPayrollShift,
+} from "../../lib/payroll/compute";
 import EmployeesSection from "../employees/EmployeesSection";
 import EmployeeGroupsSection from "../people/EmployeeGroupsSection";
 import HomeDashboardSection, { type SetupCard } from "../dashboard/HomeDashboardSection";
@@ -166,7 +169,8 @@ async function handleLogout() {
   const [isHomeMenuOpen, setIsHomeMenuOpen] = useState(false);
   const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
   const [isPeopleMenuOpen, setIsPeopleMenuOpen] = useState(false);
-  const [isPayrollMenuOpen, setIsPayrollMenuOpen] = useState(false);
+  const [isReportsMenuOpen, setIsReportsMenuOpen] = useState(false);
+  const [isPayrollNavOpen, setIsPayrollNavOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
@@ -275,7 +279,8 @@ async function handleLogout() {
     if (
       !isAdmin &&
       (activeTab === "reports-timesheets" ||
-        activeTab === "reports-payroll" ||
+        activeTab === "payroll-overview" ||
+        activeTab === "payroll-employee" ||
         activeTab === "employees" ||
         activeTab === "employee-groups")
     ) {
@@ -287,7 +292,8 @@ async function handleLogout() {
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
   }, []);
@@ -299,7 +305,8 @@ async function handleLogout() {
     }
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
     setIsHomeMenuOpen(true);
@@ -312,7 +319,8 @@ async function handleLogout() {
     }
     setIsHomeMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
     setIsScheduleMenuOpen(true);
@@ -325,24 +333,40 @@ async function handleLogout() {
     }
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
     setIsPeopleMenuOpen(true);
   }, [isPeopleMenuOpen]);
 
-  const togglePayrollMenu = useCallback(() => {
-    if (isPayrollMenuOpen) {
-      setIsPayrollMenuOpen(false);
+  const toggleReportsMenu = useCallback(() => {
+    if (isReportsMenuOpen) {
+      setIsReportsMenuOpen(false);
       return;
     }
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
-    setIsPayrollMenuOpen(true);
-  }, [isPayrollMenuOpen]);
+    setIsReportsMenuOpen(true);
+  }, [isReportsMenuOpen]);
+
+  const togglePayrollNavMenu = useCallback(() => {
+    if (isPayrollNavOpen) {
+      setIsPayrollNavOpen(false);
+      return;
+    }
+    setIsHomeMenuOpen(false);
+    setIsScheduleMenuOpen(false);
+    setIsPeopleMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
+    setIsPayrollNavOpen(true);
+  }, [isPayrollNavOpen]);
 
   const toggleSettingsMenu = useCallback(() => {
     if (isSettingsMenuOpen) {
@@ -352,7 +376,8 @@ async function handleLogout() {
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsUserMenuOpen(false);
     setIsSettingsMenuOpen(true);
   }, [isSettingsMenuOpen]);
@@ -365,7 +390,8 @@ async function handleLogout() {
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(true);
   }, [isUserMenuOpen]);
@@ -394,6 +420,20 @@ async function handleLogout() {
   });
   const [reportTimesheetEmployee, setReportTimesheetEmployee] = useState("all");
   const [reportTimesheetGroup, setReportTimesheetGroup] = useState("all");
+  const [payrollRangeMode, setPayrollRangeMode] = useState<"week" | "month" | "custom">("month");
+  const [payrollOverviewMonth, setPayrollOverviewMonth] = useState(() => new Date().getMonth() + 1);
+  const [payrollOverviewYear, setPayrollOverviewYear] = useState(currentYear);
+  const [payrollWeekStart, setPayrollWeekStart] = useState(() => startOfWeek(new Date()));
+  const [payrollCustomFrom, setPayrollCustomFrom] = useState(() => {
+    const { from } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
+    return from;
+  });
+  const [payrollCustomTo, setPayrollCustomTo] = useState(() => {
+    const { to } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
+    return to;
+  });
+  const [payrollTableEmployeeFilter, setPayrollTableEmployeeFilter] = useState("all");
+  const [payrollSelectedEmployee, setPayrollSelectedEmployee] = useState<string | null>(null);
   const [shiftRoleMode, setShiftRoleMode] = useState<"preset" | "custom">("preset");
   const [newEmployeeRoleMode, setNewEmployeeRoleMode] = useState<"preset" | "custom">("preset");
   const [employeePeriodFrom, setEmployeePeriodFrom] = useState(() => {
@@ -764,23 +804,116 @@ async function handleLogout() {
     employees,
   ]);
 
-  const payrollSummaryRows = useMemo<PayrollSummaryRow[]>(
-    () =>
-      employeeNames.map((employee) => ({
-        employee,
-        totalHours: monthlyHours[employee]?.worked ?? 0,
-        hourlyRate: employeeRateMap[employee] || 0,
-        totalCost: payrollCosts[employee]?.workedCost ?? 0,
-        active: employees.find((e) => e.name === employee)?.active ?? true,
-      })),
-    [employeeNames, monthlyHours, employeeRateMap, payrollCosts, employees]
-  );
+  const payrollRangeBounds = useMemo(() => {
+    if (payrollRangeMode === "month") {
+      return calendarMonthRange(payrollOverviewMonth, payrollOverviewYear);
+    }
+    if (payrollRangeMode === "custom") {
+      return { from: payrollCustomFrom, to: payrollCustomTo };
+    }
+    const from = toDateInputValue(payrollWeekStart);
+    const to = toDateInputValue(addDays(payrollWeekStart, 6));
+    return { from, to };
+  }, [
+    payrollRangeMode,
+    payrollOverviewMonth,
+    payrollOverviewYear,
+    payrollCustomFrom,
+    payrollCustomTo,
+    payrollWeekStart,
+  ]);
 
-  const payrollSummaryTotals = useMemo(() => {
-    const totalHours = payrollSummaryRows.reduce((s, r) => s + r.totalHours, 0);
-    const totalPayrollCost = payrollSummaryRows.reduce((s, r) => s + r.totalCost, 0);
-    return { totalHours, totalPayrollCost };
-  }, [payrollSummaryRows]);
+  const payrollPeriodLabel = useMemo(() => {
+    const { from, to } = payrollRangeBounds;
+    if (payrollRangeMode === "week") {
+      return `Week ${from} – ${to}`;
+    }
+    if (payrollRangeMode === "month") {
+      return `${monthNames[payrollOverviewMonth]} ${payrollOverviewYear}`;
+    }
+    return `${from} – ${to}`;
+  }, [
+    payrollRangeBounds,
+    payrollRangeMode,
+    payrollOverviewMonth,
+    payrollOverviewYear,
+    monthNames,
+  ]);
+
+  const payrollBaseShiftsInRange = useMemo(() => {
+    const { from, to } = payrollRangeBounds;
+    return shifts.filter((s) => s.date >= from && s.date <= to);
+  }, [shifts, payrollRangeBounds]);
+
+  const payrollShiftsForTable = useMemo(() => {
+    if (payrollTableEmployeeFilter === "all") return payrollBaseShiftsInRange;
+    return payrollBaseShiftsInRange.filter((s) => s.employee === payrollTableEmployeeFilter);
+  }, [payrollBaseShiftsInRange, payrollTableEmployeeFilter]);
+
+  const payrollOverviewRows = useMemo<PayrollOverviewRow[]>(() => {
+    const names =
+      payrollTableEmployeeFilter === "all" ? employeeNames : [payrollTableEmployeeFilter];
+    return names.map((name) => {
+      const list = payrollShiftsForTable.filter((s) => s.employee === name);
+      const rate = employeeRateMap[name] || 0;
+      let totalHours = 0;
+      let totalEarnings = 0;
+      for (const sh of list) {
+        const h = hoursForPayrollShift(sh);
+        totalHours += h;
+        totalEarnings += earningsForShift(sh, rate);
+      }
+      return {
+        employee: name,
+        totalHours,
+        hourlyRate: rate,
+        totalEarnings,
+        active: employees.find((e) => e.name === name)?.active ?? true,
+      };
+    });
+  }, [payrollShiftsForTable, payrollTableEmployeeFilter, employeeNames, employeeRateMap, employees]);
+
+  const payrollOverviewTotals = useMemo(() => {
+    const totalHours = payrollOverviewRows.reduce((s, r) => s + r.totalHours, 0);
+    const totalPayrollCost = payrollOverviewRows.reduce((s, r) => s + r.totalEarnings, 0);
+    const averageHourlyCost = totalHours > 0 ? totalPayrollCost / totalHours : 0;
+    return { totalHours, totalPayrollCost, averageHourlyCost };
+  }, [payrollOverviewRows]);
+
+  const payrollEmployeeDetailShifts = useMemo(() => {
+    if (!payrollSelectedEmployee) return [];
+    return payrollBaseShiftsInRange
+      .filter((s) => s.employee === payrollSelectedEmployee)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+  }, [payrollBaseShiftsInRange, payrollSelectedEmployee]);
+
+  const payrollEmployeeDetailTotals = useMemo(() => {
+    if (!payrollSelectedEmployee) {
+      return { totalHours: 0, totalEarnings: 0, rate: 0 };
+    }
+    const rate = employeeRateMap[payrollSelectedEmployee] || 0;
+    let totalHours = 0;
+    let totalEarnings = 0;
+    for (const sh of payrollEmployeeDetailShifts) {
+      totalHours += hoursForPayrollShift(sh);
+      totalEarnings += earningsForShift(sh, rate);
+    }
+    return { totalHours, totalEarnings, rate };
+  }, [payrollSelectedEmployee, payrollEmployeeDetailShifts, employeeRateMap]);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === "payroll-employee" && !payrollSelectedEmployee) {
+      setActiveTab("payroll-overview");
+    }
+  }, [isAdmin, activeTab, payrollSelectedEmployee]);
+
+  const payrollWeekPrev = useCallback(() => {
+    setPayrollWeekStart((d) => addDays(d, -7));
+  }, []);
+
+  const payrollWeekNext = useCallback(() => {
+    setPayrollWeekStart((d) => addDays(d, 7));
+  }, []);
 
   function resetForm() {
     const firstEmployee = activeEmployees[0];
@@ -1425,6 +1558,14 @@ async function handleLogout() {
     if (reportTimesheetEmployee === oldName) {
       setReportTimesheetEmployee(trimmed);
     }
+
+    if (payrollSelectedEmployee === oldName) {
+      setPayrollSelectedEmployee(trimmed);
+    }
+
+    if (payrollTableEmployeeFilter === oldName) {
+      setPayrollTableEmployeeFilter(trimmed);
+    }
   }
 
   async function setEmployeeActiveStatus(name: string, active: boolean) {
@@ -1543,6 +1684,15 @@ async function handleLogout() {
 
     if (reportTimesheetEmployee === name) {
       setReportTimesheetEmployee("all");
+    }
+
+    if (payrollSelectedEmployee === name) {
+      setPayrollSelectedEmployee(null);
+      setActiveTab("payroll-overview");
+    }
+
+    if (payrollTableEmployeeFilter === name) {
+      setPayrollTableEmployeeFilter("all");
     }
   }
 
@@ -1889,25 +2039,27 @@ async function handleLogout() {
   }
 
   function downloadPayrollCsv() {
+    const { from, to } = payrollRangeBounds;
     const rows = [
       ["Company", workspaceName],
       ["CVR", workspaceCvr],
-      ["Month", monthNames[monthFilter]],
-      ["Year", String(yearFilter)],
+      ["Period", payrollPeriodLabel],
+      ["From", from],
+      ["To", to],
       [],
-      ["Employee", "Total hours", "Hourly rate (DKK)", "Total cost (DKK)"],
-      ...payrollSummaryRows.map((r) => [
+      ["Employee", "Total hours", "Hourly rate (DKK)", "Total earnings (DKK)"],
+      ...payrollOverviewRows.map((r) => [
         r.employee,
         r.totalHours.toFixed(2),
         r.hourlyRate.toFixed(2),
-        r.totalCost.toFixed(2),
+        r.totalEarnings.toFixed(2),
       ]),
       [],
       [
         "Totals",
-        payrollSummaryTotals.totalHours.toFixed(2),
+        payrollOverviewTotals.totalHours.toFixed(2),
         "",
-        payrollSummaryTotals.totalPayrollCost.toFixed(2),
+        payrollOverviewTotals.totalPayrollCost.toFixed(2),
       ],
     ];
 
@@ -1919,9 +2071,7 @@ async function handleLogout() {
     link.href = url;
     link.setAttribute(
       "download",
-      `${workspaceName.replace(/\s+/g, "-").toLowerCase()}-${monthNames[
-        monthFilter
-      ].toLowerCase()}-${yearFilter}-payroll-summary.csv`
+      `${workspaceName.replace(/\s+/g, "-").toLowerCase()}-payroll-${from}-to-${to}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -1932,7 +2082,7 @@ async function handleLogout() {
     const reportHtml = `
       <html>
         <head>
-          <title>Payroll summary</title>
+          <title>Payroll overview</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
             h1, p { margin: 0 0 10px 0; }
@@ -1948,12 +2098,17 @@ async function handleLogout() {
           <div class="header">
             <h1>${workspaceName}</h1>
             <p>CVR: ${workspaceCvr}</p>
-            <p>Payroll summary — ${monthNames[monthFilter]} ${yearFilter}</p>
+            <p>Payroll overview — ${payrollPeriodLabel}</p>
           </div>
 
           <div class="summary">
-            <p><strong>Total hours:</strong> ${payrollSummaryTotals.totalHours.toFixed(1)} hrs</p>
-            <p><strong>Total payroll cost:</strong> ${formatDKK(payrollSummaryTotals.totalPayrollCost)}</p>
+            <p><strong>Total hours worked:</strong> ${payrollOverviewTotals.totalHours.toFixed(1)} hrs</p>
+            <p><strong>Total payroll cost:</strong> ${formatDKK(payrollOverviewTotals.totalPayrollCost)}</p>
+            <p><strong>Average hourly cost:</strong> ${
+              payrollOverviewTotals.totalHours > 0
+                ? formatDKK(payrollOverviewTotals.averageHourlyCost)
+                : "—"
+            }</p>
           </div>
 
           <table>
@@ -1962,18 +2117,18 @@ async function handleLogout() {
                 <th>Employee</th>
                 <th>Total hours</th>
                 <th>Hourly rate (DKK)</th>
-                <th>Total cost</th>
+                <th>Total earnings</th>
               </tr>
             </thead>
             <tbody>
-              ${payrollSummaryRows
+              ${payrollOverviewRows
                 .map(
                   (r) => `
                 <tr>
                   <td>${r.employee}</td>
                   <td>${r.totalHours.toFixed(1)}</td>
                   <td>${r.hourlyRate.toFixed(2)}</td>
-                  <td>${r.totalCost.toFixed(2)}</td>
+                  <td>${r.totalEarnings.toFixed(2)}</td>
                 </tr>
               `
                 )
@@ -2275,8 +2430,8 @@ async function handleLogout() {
     router.push("/invites");
   }
 
-  function openReportsPayrollFromHome() {
-    setActiveTab("reports-payroll");
+  function openPayrollOverviewFromHome() {
+    setActiveTab("payroll-overview");
   }
 
   function openHomeMenuTab(tab: AppTab) {
@@ -2284,7 +2439,8 @@ async function handleLogout() {
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
   }
@@ -2294,7 +2450,8 @@ async function handleLogout() {
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
   }
@@ -2304,7 +2461,8 @@ async function handleLogout() {
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
   }
@@ -2314,7 +2472,8 @@ async function handleLogout() {
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
   }
@@ -2324,29 +2483,35 @@ async function handleLogout() {
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
   }
 
-  function openPayrollMenuTab(tab: AppTab) {
+  function openReportsMenuTab(tab: AppTab) {
     setActiveTab(tab);
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
   }
 
-  function openPayrollMenuRoute(path: string) {
-    router.push(path);
+  function openPayrollSectionTab(tab: AppTab) {
+    setActiveTab(tab);
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
+    if (tab === "payroll-overview") {
+      setPayrollSelectedEmployee(null);
+    }
   }
 
   function openSettingsMenuRoute(path: string) {
@@ -2354,7 +2519,8 @@ async function handleLogout() {
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
   }
@@ -2364,7 +2530,8 @@ async function handleLogout() {
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
     setIsPeopleMenuOpen(false);
-    setIsPayrollMenuOpen(false);
+    setIsReportsMenuOpen(false);
+    setIsPayrollNavOpen(false);
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
   }
@@ -2416,8 +2583,8 @@ async function handleLogout() {
           : hasEmployees
           ? "in_progress"
           : "not_started",
-        actionLabel: "Open reports",
-        onAction: openReportsPayrollFromHome,
+        actionLabel: "Open payroll",
+        onAction: openPayrollOverviewFromHome,
       },
       {
         id: "invite",
@@ -2444,7 +2611,7 @@ async function handleLogout() {
       openAddEmployeeFromHeader,
       openCreateShiftFromHeader,
       openInviteTeamFromHome,
-      openReportsPayrollFromHome,
+      openPayrollOverviewFromHome,
     ]
   );
 
@@ -2463,13 +2630,15 @@ async function handleLogout() {
         isHomeMenuOpen={isHomeMenuOpen}
         isScheduleMenuOpen={isScheduleMenuOpen}
         isPeopleMenuOpen={isPeopleMenuOpen}
-        isPayrollMenuOpen={isPayrollMenuOpen}
+        isReportsMenuOpen={isReportsMenuOpen}
+        isPayrollNavOpen={isPayrollNavOpen}
         isSettingsMenuOpen={isSettingsMenuOpen}
         isUserMenuOpen={isUserMenuOpen}
         onToggleHomeMenu={toggleHomeMenu}
         onToggleScheduleMenu={toggleScheduleMenu}
         onTogglePeopleMenu={togglePeopleMenu}
-        onTogglePayrollMenu={togglePayrollMenu}
+        onToggleReportsMenu={toggleReportsMenu}
+        onTogglePayrollNavMenu={togglePayrollNavMenu}
         onToggleSettingsMenu={toggleSettingsMenu}
         onToggleUserMenu={toggleUserMenu}
         closeAllNavMenus={closeAllNavMenus}
@@ -2478,8 +2647,8 @@ async function handleLogout() {
         openScheduleMenuTab={openScheduleMenuTab}
         openScheduleMenuRoute={openScheduleMenuRoute}
         openPeopleMenuTab={openPeopleMenuTab}
-        openPayrollMenuTab={openPayrollMenuTab}
-        openPayrollMenuRoute={openPayrollMenuRoute}
+        openReportsMenuTab={openReportsMenuTab}
+        openPayrollSectionTab={openPayrollSectionTab}
         openSettingsMenuRoute={openSettingsMenuRoute}
         openUserMenuRoute={openUserMenuRoute}
         onLogout={handleLogout}
@@ -2705,7 +2874,7 @@ async function handleLogout() {
             onAddEmployee={openAddEmployeeFromHeader}
             onCreateShift={openCreateShiftFromHeader}
             onInviteTeam={openInviteTeamFromHome}
-            onReviewPayroll={openReportsPayrollFromHome}
+            onReviewPayroll={openPayrollOverviewFromHome}
             showPayrollCta={isAdmin}
           />
         )}
@@ -2846,23 +3015,56 @@ async function handleLogout() {
             onExportPdf={downloadTimesheetsReportPdf}
           />
         )}
-        {isAdmin && activeTab === "reports-payroll" && (
-          <PayrollSummaryReport
+        {isAdmin && activeTab === "payroll-overview" && (
+          <PayrollOverview
             workspaceName={workspaceName}
-            monthFilter={monthFilter}
-            setMonthFilter={setMonthFilter}
-            yearFilter={yearFilter}
-            setYearFilter={setYearFilter}
+            periodLabel={payrollPeriodLabel}
+            rangeMode={payrollRangeMode}
+            onRangeModeChange={setPayrollRangeMode}
+            monthValue={payrollOverviewMonth}
+            onMonthChange={setPayrollOverviewMonth}
+            yearValue={payrollOverviewYear}
+            onYearChange={setPayrollOverviewYear}
             yearsAvailable={yearsAvailable}
             monthNames={monthNames}
-            rows={payrollSummaryRows}
-            totalHours={payrollSummaryTotals.totalHours}
-            totalPayrollCost={payrollSummaryTotals.totalPayrollCost}
+            onWeekPrev={payrollWeekPrev}
+            onWeekNext={payrollWeekNext}
+            customFrom={payrollCustomFrom}
+            customTo={payrollCustomTo}
+            onCustomFromChange={setPayrollCustomFrom}
+            onCustomToChange={setPayrollCustomTo}
+            employeeFilter={payrollTableEmployeeFilter}
+            onEmployeeFilterChange={setPayrollTableEmployeeFilter}
+            employeeNames={employeeNames}
+            rows={payrollOverviewRows}
+            totalHours={payrollOverviewTotals.totalHours}
+            totalPayrollCost={payrollOverviewTotals.totalPayrollCost}
+            averageHourlyCost={payrollOverviewTotals.averageHourlyCost}
             formatDKK={formatDKK}
+            onRowClick={(name) => {
+              setPayrollSelectedEmployee(name);
+              setActiveTab("payroll-employee");
+            }}
             onExportCsv={downloadPayrollCsv}
             onExportPdf={downloadPayrollPdf}
           />
         )}
+        {isAdmin && activeTab === "payroll-employee" && payrollSelectedEmployee ? (
+          <EmployeePayrollDetail
+            workspaceName={workspaceName}
+            employeeName={payrollSelectedEmployee}
+            periodLabel={payrollPeriodLabel}
+            hourlyRate={payrollEmployeeDetailTotals.rate}
+            totalHours={payrollEmployeeDetailTotals.totalHours}
+            totalEarnings={payrollEmployeeDetailTotals.totalEarnings}
+            shifts={payrollEmployeeDetailShifts}
+            formatDKK={formatDKK}
+            onBack={() => {
+              setPayrollSelectedEmployee(null);
+              setActiveTab("payroll-overview");
+            }}
+          />
+        ) : null}
               
           
        {isAdmin && activeTab === "employees" && (

@@ -53,6 +53,7 @@ export type AppTab =
   | "week"
   | "month"
   | "reports-timesheets"
-  | "reports-payroll"
+  | "payroll-overview"
+  | "payroll-employee"
   | "employees"
   | "employee-groups";
