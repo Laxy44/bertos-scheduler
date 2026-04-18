@@ -17,8 +17,7 @@ const navLinks: { href: string; label: string }[] = [
   { href: "/", label: "Home" },
   { href: "/your-schedule", label: "Your schedule" },
   { href: "/your-availability", label: "Your availability" },
-  { href: "/your-leave-overview", label: "Your leave overview" },
-  { href: "/payslips", label: "Payslips" },
+  { href: "/punch-clock", label: "Punch clock" },
 ];
 
 /**

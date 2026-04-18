@@ -85,18 +85,12 @@ export default function ScheduleGrid({
     return { visibleDateSet: set, visiblePeriodShifts: periodShifts, dayShiftCountMap: counts };
   }, [columnDates, shifts]);
 
-  const getShiftStatusLabel = (shift: any) => {
-    if (shift.approved) return "Approved";
-    if (shift.actualStart && shift.actualEnd) return "Actual saved";
-    if (shift.actualStart && !shift.actualEnd) return "Clocked in";
-    return "Planned";
-  };
+  const getShiftStatusLabel = (shift: any) => (shift.approved ? "Approved" : "Draft");
 
-  const getShiftStatusStyles = (shift: any) => {
-    if (shift.approved) return "border-emerald-300 bg-emerald-100 text-emerald-800";
-    if (shift.actualStart) return "border-blue-200 bg-blue-50 text-blue-700";
-    return "border-slate-200 bg-white text-slate-600";
-  };
+  const getShiftStatusStyles = (shift: any) =>
+    shift.approved
+      ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+      : "border-slate-200 bg-white text-slate-600";
 
   const getEmployeePeriodStats = (employeeNameValue: string) => {
     const employeeShifts = visiblePeriodShifts.filter(

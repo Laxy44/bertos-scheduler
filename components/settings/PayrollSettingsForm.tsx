@@ -58,9 +58,7 @@ export default function PayrollSettingsForm({ initialCurrency, initialDefaultHou
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-slate-400">
-            Three-letter ISO codes. More currencies can ship with accounting integrations later.
-          </span>
+          <span className="mt-1 block text-xs text-slate-400">Three-letter ISO codes (e.g. DKK, EUR, GBP).</span>
         </label>
 
         <label className="block text-sm">

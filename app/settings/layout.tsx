@@ -15,7 +15,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Settings</p>
               <h1 className="mt-1 text-lg font-bold text-slate-900">Workspace</h1>
               <p className="mt-1 text-xs text-slate-500">
-                Core preferences only. Integrations, leave, and advanced payroll can be added later.
+                Company, schedule, people, payroll, and security for this workspace.
               </p>
             </div>
             <SettingsSubnav />

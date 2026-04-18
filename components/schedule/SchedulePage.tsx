@@ -539,13 +539,7 @@ export default function SchedulePage(props: any) {
               .sort((a: any, b: any) => a.start.localeCompare(b.start))
               .map((shift: any) => {
                 const workedHours = getWorkedHours(shift);
-                const status = shift.approved
-                  ? "Approved"
-                  : shift.actualStart && shift.actualEnd
-                  ? "Actual saved"
-                  : shift.actualStart
-                  ? "Clocked in"
-                  : "Planned";
+                const status = shift.approved ? "Approved" : "Draft";
                 return (
                   <div
                     key={shift.id}
@@ -623,6 +617,15 @@ export default function SchedulePage(props: any) {
                             )}`}
                           >
                             {shift.role}
+                          </span>
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                              isApproved
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                : "border-slate-200 bg-slate-50 text-slate-600"
+                            }`}
+                          >
+                            {isApproved ? "Approved" : "Draft"}
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-slate-500">

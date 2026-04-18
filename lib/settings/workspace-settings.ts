@@ -1,7 +1,4 @@
-/**
- * Typed slices of `companies.workspace_settings` (jsonb).
- * Reserved for future: integrations, advanced payroll, leave rules — keep keys stable.
- */
+/** Typed slices of `companies.workspace_settings` (jsonb). */
 
 export type ShiftTypeRow = { id: string; name: string };
 
