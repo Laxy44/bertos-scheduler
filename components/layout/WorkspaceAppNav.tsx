@@ -378,50 +378,31 @@ export default function WorkspaceAppNav({
           </div>
         ) : null}
 
-        <div className="relative" ref={settingsRef}>
-          <button
-            type="button"
-            onClick={onToggleSettingsMenu}
-            className={`${navBtn} ${isSettingsMenuOpen ? navBtnActive : navBtnIdle}`}
-          >
-            Settings <span className="text-[10px] opacity-70">▾</span>
-          </button>
-          <AnchoredMenu
-            open={isSettingsMenuOpen}
-            onClose={closeAllNavMenus}
-            anchorRef={settingsRef}
-            contentClassName="w-56"
-          >
-            {isAdmin ? (
-              <>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openSettingsMenuRoute("/settings/general")}
-                >
-                  Settings
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openUserMenuRoute("/profile")}
-                >
-                  Profile
-                </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openUserMenuRoute("/account")}
-                >
-                  Account
-                </button>
-              </>
-            )}
-          </AnchoredMenu>
-        </div>
+        {isAdmin ? (
+          <div className="relative" ref={settingsRef}>
+            <button
+              type="button"
+              onClick={onToggleSettingsMenu}
+              className={`${navBtn} ${isSettingsMenuOpen ? navBtnActive : navBtnIdle}`}
+            >
+              Settings <span className="text-[10px] opacity-70">▾</span>
+            </button>
+            <AnchoredMenu
+              open={isSettingsMenuOpen}
+              onClose={closeAllNavMenus}
+              anchorRef={settingsRef}
+              contentClassName="w-56"
+            >
+              <button
+                type="button"
+                className={menuItem}
+                onClick={() => openSettingsMenuRoute("/settings/general")}
+              >
+                Settings
+              </button>
+            </AnchoredMenu>
+          </div>
+        ) : null}
 
         <div className="ml-auto flex flex-wrap items-center gap-1 border-l border-slate-800/80 pl-2">
           {(

@@ -2,10 +2,11 @@
 
 
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "../../lib/supabase";
 import ScheduleSection from "../schedule/ScheduleSection";
 import ShiftFormModal from "../schedule/ShiftFormModal";
+import GuidedWorkspaceSetup from "../onboarding/GuidedWorkspaceSetup";
 import WorkspaceAppNav from "./WorkspaceAppNav";
 import WeekSection from "../schedule/WeekSection";
 import MonthSection from "../month/MonthSection";
@@ -114,7 +115,12 @@ type AppShellProps = {
   companyWeekStartsOn?: "monday" | "sunday" | null;
   companyCurrency?: string | null;
   companyDefaultHourlyWage?: number | null;
+  /** Open first-time guided setup when landing from company success (?guided=1). */
+  launchGuidedSetup?: boolean;
 };
+
+const GUIDED_DISMISS_KEY = "planyo_guided_setup_dismissed_v1";
+const GUIDED_PENDING_KEY = "planyo_guided_pending";
 
 export default function AppShell({
   role,
@@ -125,9 +131,18 @@ export default function AppShell({
   companyWeekStartsOn,
   companyCurrency,
   companyDefaultHourlyWage,
+  launchGuidedSetup = false,
 }: AppShellProps) {
   const normalizedRole = (role || "employee").toLowerCase();
   const isAdmin = isCompanyAdminRole(role);
+
+  /** Central guard for admin-only mutations and exports (logic-level, not UI-only). */
+  function guardAdmin(action: string): boolean {
+    if (isAdmin) return true;
+    alert(`Only workspace admins can ${action}.`);
+    return false;
+  }
+
   const workspaceName = companyName || "Workspace";
   const workspaceCvr = companyCvr || "";
   const weekPref: WeekStartPreference =
@@ -162,6 +177,28 @@ export default function AppShell({
     );
   }, [activeCompanyId, isAdmin, supabase]);
 
+  const ensureDefaultEmployeeGroup = useCallback(async () => {
+    if (!activeCompanyId || !isAdmin) {
+      throw new Error("Not allowed.");
+    }
+    const { count, error: countError } = await supabase
+      .from("employee_groups")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", activeCompanyId);
+    if (countError) throw new Error(countError.message);
+    if ((count ?? 0) > 0) {
+      await loadEmployeeGroups();
+      return;
+    }
+    const { error } = await supabase.from("employee_groups").insert({
+      company_id: activeCompanyId,
+      name: "General",
+      hourly_wage: null,
+    });
+    if (error) throw new Error(error.message);
+    await loadEmployeeGroups();
+  }, [activeCompanyId, isAdmin, loadEmployeeGroups, supabase]);
+
 async function handleLogout() {
   await supabase.auth.signOut();
   router.push("/login");
@@ -182,6 +219,14 @@ async function handleLogout() {
   const [employeeGroups, setEmployeeGroups] = useState<EmployeeGroupRow[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
+  const [guidedSetupOpen, setGuidedSetupOpen] = useState(false);
+  const [shiftDayAvailabilityByEmployee, setShiftDayAvailabilityByEmployee] = useState<
+    Record<string, string>
+  >({});
+  /** Re-open guided setup after closing the shift form without creating a shift yet. */
+  const resumeGuidedAfterShiftModalClose = useRef(false);
+  /** Re-open guided setup when the user returns to Home after visiting Employees or Groups. */
+  const resumeGuidedWhenHome = useRef(false);
   const [isHomeMenuOpen, setIsHomeMenuOpen] = useState(false);
   const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
   const [isPeopleMenuOpen, setIsPeopleMenuOpen] = useState(false);
@@ -525,6 +570,132 @@ async function handleLogout() {
   }, [employees, shifts]);
 
   const weekDates = useMemo(() => getWeekDates(weekStart, weekPref), [weekStart, weekPref]);
+  const hasShiftsForGuided = shifts.length > 0;
+
+  useEffect(() => {
+    if (hasShiftsForGuided) {
+      resumeGuidedAfterShiftModalClose.current = false;
+      resumeGuidedWhenHome.current = false;
+      setGuidedSetupOpen(false);
+    }
+  }, [hasShiftsForGuided]);
+
+  useEffect(() => {
+    if (!isAdmin || hasShiftsForGuided) return;
+    try {
+      if (typeof window !== "undefined" && window.sessionStorage.getItem(GUIDED_DISMISS_KEY)) {
+        return;
+      }
+    } catch {
+      return;
+    }
+    let shouldOpen = Boolean(launchGuidedSetup);
+    try {
+      if (typeof window !== "undefined" && window.sessionStorage.getItem(GUIDED_PENDING_KEY) === "1") {
+        window.sessionStorage.removeItem(GUIDED_PENDING_KEY);
+        shouldOpen = true;
+      }
+    } catch {
+      // ignore
+    }
+    if (shouldOpen) {
+      setGuidedSetupOpen(true);
+    }
+  }, [isAdmin, hasShiftsForGuided, launchGuidedSetup]);
+
+  const readGuidedDismissedSession = useCallback(() => {
+    try {
+      return (
+        typeof window !== "undefined" &&
+        window.sessionStorage.getItem(GUIDED_DISMISS_KEY) === "1"
+      );
+    } catch {
+      return true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin || hasShiftsForGuided) {
+      resumeGuidedAfterShiftModalClose.current = false;
+      return;
+    }
+    if (resumeGuidedAfterShiftModalClose.current && !showShiftForm) {
+      resumeGuidedAfterShiftModalClose.current = false;
+      if (!readGuidedDismissedSession()) {
+        setGuidedSetupOpen(true);
+      }
+    }
+  }, [isAdmin, hasShiftsForGuided, showShiftForm, readGuidedDismissedSession]);
+
+  useEffect(() => {
+    if (!isAdmin || hasShiftsForGuided) {
+      resumeGuidedWhenHome.current = false;
+      return;
+    }
+    if (resumeGuidedWhenHome.current && activeTab === "home") {
+      resumeGuidedWhenHome.current = false;
+      if (!readGuidedDismissedSession()) {
+        setGuidedSetupOpen(true);
+      }
+    }
+  }, [isAdmin, hasShiftsForGuided, activeTab, readGuidedDismissedSession]);
+
+  const activeEmployeesAvailabilityKey = useMemo(
+    () =>
+      `${form.date}|${activeEmployees.map((e) => `${e.name}:${e.userId ?? ""}`).sort().join(";")}`,
+    [form.date, activeEmployees]
+  );
+
+  useEffect(() => {
+    if (!isAdmin || !activeCompanyId || !showShiftForm) {
+      setShiftDayAvailabilityByEmployee({});
+      return;
+    }
+    const date = form.date;
+    const pairs = activeEmployees
+      .map((e) => ({ name: e.name, userId: e.userId }))
+      .filter((p): p is { name: string; userId: string } => Boolean(p.userId));
+    if (pairs.length === 0) {
+      const noneMap: Record<string, string> = {};
+      activeEmployees.forEach((e) => {
+        noneMap[e.name] = "none";
+      });
+      setShiftDayAvailabilityByEmployee(noneMap);
+      return;
+    }
+    let cancelled = false;
+    const userIds = pairs.map((p) => p.userId);
+    void supabase
+      .from("employee_availability")
+      .select("user_id, status")
+      .eq("company_id", activeCompanyId)
+      .eq("date", date)
+      .in("user_id", userIds)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.warn("[availability] shift form", error.message);
+          setShiftDayAvailabilityByEmployee({});
+          return;
+        }
+        const byUser = Object.fromEntries(
+          (data || []).map((row: { user_id: string; status: string }) => [row.user_id, row.status])
+        );
+        const byName: Record<string, string> = {};
+        activeEmployees.forEach((e) => {
+          if (!e.userId) {
+            byName[e.name] = "none";
+          } else {
+            byName[e.name] = (byUser[e.userId] as string) || "undecided";
+          }
+        });
+        setShiftDayAvailabilityByEmployee(byName);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, activeCompanyId, showShiftForm, activeEmployeesAvailabilityKey, supabase, activeEmployees]);
+
   const selectedDayName = useMemo(
     () => getDayNameFromDate(selectedDate),
     [selectedDate]
@@ -961,20 +1132,8 @@ async function handleLogout() {
       return;
     }
 
-    const selfName = (employeeName || "").trim();
-
-    if (!isAdmin) {
-      if (selfName && form.employee.trim() !== selfName) {
-        alert("You can only schedule shifts for yourself.");
-        return;
-      }
-      if (editingId) {
-        const existing = shifts.find((s) => s.id === editingId);
-        if (existing && existing.employee !== selfName) {
-          alert("You can only edit your own shifts.");
-          return;
-        }
-      }
+    if (!guardAdmin("create or edit planned shifts")) {
+      return;
     }
 
     if (activeEmployees.length === 0) {
@@ -1006,6 +1165,14 @@ async function handleLogout() {
         `${form.employee} is marked as unavailable on ${form.date}. Please choose another date or remove the unavailable day first.`
       );
       return;
+    }
+
+    const dayAvail = shiftDayAvailabilityByEmployee[form.employee];
+    if (isAdmin && dayAvail === "cannot_work") {
+      const ok = window.confirm(
+        `${form.employee} marked themselves as cannot work on ${form.date}. Save this shift anyway?`
+      );
+      if (!ok) return;
     }
 
     const finalRole = form.role.trim();
@@ -1106,8 +1273,7 @@ async function handleLogout() {
   }
 
   function startEdit(shift: Shift) {
-    if (!isAdmin && shift.employee !== (employeeName || "").trim()) {
-      alert("You can only edit your own shifts.");
+    if (!guardAdmin("edit planned shifts")) {
       return;
     }
 
@@ -1128,13 +1294,16 @@ async function handleLogout() {
   }
 
   async function deleteShift(id: string) {
+    if (!activeCompanyId) {
+      alert("No active company workspace found for this user.");
+      return;
+    }
     const target = shifts.find((s) => s.id === id);
     if (!target) {
       alert("Shift not found.");
       return;
     }
-    if (!isAdmin && target.employee !== (employeeName || "").trim()) {
-      alert("You can only delete your own shifts.");
+    if (!guardAdmin("delete shifts")) {
       return;
     }
 
@@ -1154,8 +1323,7 @@ async function handleLogout() {
   }
 
   async function copyDayShifts() {
-    if (!isAdmin) {
-      alert("Only workspace admins can copy a full day of shifts.");
+    if (!guardAdmin("copy a full day of shifts")) {
       return;
     }
 
@@ -1266,8 +1434,7 @@ async function handleLogout() {
   }
 
   async function clearSelectedDay() {
-    if (!isAdmin) {
-      alert("Only workspace admins can clear all shifts for a day.");
+    if (!guardAdmin("clear all shifts for a day")) {
       return;
     }
 
@@ -1293,13 +1460,13 @@ async function handleLogout() {
   }
 
   async function setShiftApproval(id: string, approved: boolean) {
+    if (!guardAdmin("change shift approval")) {
+      return;
+    }
+
     const target = shifts.find((s) => s.id === id);
     if (!target) {
       alert("Shift not found.");
-      return;
-    }
-    if (!isAdmin && target.employee !== (employeeName || "").trim()) {
-      alert("You can only change approval on your own shifts.");
       return;
     }
 
@@ -1328,15 +1495,14 @@ async function handleLogout() {
   }
 
   async function applyPlannedAsActual(shiftId: string) {
+    if (!guardAdmin("approve shifts as planned")) {
+      return;
+    }
+
     const targetShift = shifts.find((shift) => shift.id === shiftId);
 
     if (!targetShift) {
       alert("Shift not found.");
-      return;
-    }
-
-    if (!isAdmin && targetShift.employee !== (employeeName || "").trim()) {
-      alert("You can only approve your own shifts.");
       return;
     }
 
@@ -1353,8 +1519,7 @@ async function handleLogout() {
   }
 
   async function applyPlannedToAllSelectedDay() {
-    if (!isAdmin) {
-      alert("Only workspace admins can bulk-approve a day.");
+    if (!guardAdmin("bulk-approve shifts for a day")) {
       return;
     }
 
@@ -1383,7 +1548,7 @@ async function handleLogout() {
 
   function goToPreviousWeek() {
     const newWeekStart = addDays(weekStart, -7);
-    const newWeekDates = getWeekDates(newWeekStart);
+    const newWeekDates = getWeekDates(newWeekStart, weekPref);
     setWeekStart(newWeekStart);
     setSelectedDate(newWeekDates[0].date);
     setCopyFromDate(newWeekDates[0].date);
@@ -1392,7 +1557,7 @@ async function handleLogout() {
 
   function goToNextWeek() {
     const newWeekStart = addDays(weekStart, 7);
-    const newWeekDates = getWeekDates(newWeekStart);
+    const newWeekDates = getWeekDates(newWeekStart, weekPref);
     setWeekStart(newWeekStart);
     setSelectedDate(newWeekDates[0].date);
     setCopyFromDate(newWeekDates[0].date);
@@ -1401,7 +1566,7 @@ async function handleLogout() {
 
   function goToThisWeek() {
     const newWeekStart = startOfWeekWithPreference(new Date(), weekPref);
-    const newWeekDates = getWeekDates(newWeekStart);
+    const newWeekDates = getWeekDates(newWeekStart, weekPref);
     setWeekStart(newWeekStart);
     setSelectedDate(todayDate);
     setCopyFromDate(newWeekDates[0].date);
@@ -2057,6 +2222,9 @@ async function handleLogout() {
   }
 
   function downloadPayrollCsv() {
+    if (!guardAdmin("export payroll data")) {
+      return;
+    }
     const { from, to } = payrollRangeBounds;
     const rows = [
       ["Company", workspaceName],
@@ -2097,6 +2265,9 @@ async function handleLogout() {
   }
 
   function downloadPayrollPdf() {
+    if (!guardAdmin("export payroll data")) {
+      return;
+    }
     const reportHtml = `
       <html>
         <head>
@@ -2176,6 +2347,9 @@ async function handleLogout() {
   }
 
   function downloadTimesheetsReportCsv() {
+    if (!guardAdmin("export timesheet reports")) {
+      return;
+    }
     const headers = [
       "Employee",
       "Date",
@@ -2225,6 +2399,9 @@ async function handleLogout() {
   }
 
   function downloadTimesheetsReportPdf() {
+    if (!guardAdmin("export timesheet reports")) {
+      return;
+    }
     const rowsHtml =
       timesheetReportFilteredShifts.length === 0
         ? '<tr><td colspan="7">No shifts match these filters.</td></tr>'
@@ -2435,20 +2612,88 @@ async function handleLogout() {
   }
 
   function openCreateShiftFromHeader() {
+    if (!guardAdmin("create shifts")) {
+      return;
+    }
     setActiveTab("schedule");
     resetForm();
     setShowShiftForm(true);
   }
 
+  function dismissGuidedSetup() {
+    resumeGuidedAfterShiftModalClose.current = false;
+    resumeGuidedWhenHome.current = false;
+    setGuidedSetupOpen(false);
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(GUIDED_DISMISS_KEY, "1");
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  function openEmployeeGroupsFromGuided() {
+    if (!guardAdmin("manage employee groups")) {
+      return;
+    }
+    closeAllNavMenus();
+    setActiveTab("employee-groups");
+    setGuidedSetupOpen(false);
+    resumeGuidedWhenHome.current = true;
+  }
+
+  function openEmployeesFromGuided() {
+    if (!guardAdmin("manage employees")) {
+      return;
+    }
+    closeAllNavMenus();
+    setActiveTab("employees");
+    setGuidedSetupOpen(false);
+    resumeGuidedWhenHome.current = true;
+  }
+
+  function guidedCreateShift() {
+    closeAllNavMenus();
+    resumeGuidedAfterShiftModalClose.current = true;
+    setGuidedSetupOpen(false);
+    openCreateShiftFromHeader();
+  }
+
+  function openRunSetupGuideFromHome() {
+    if (!guardAdmin("run the setup guide")) {
+      return;
+    }
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(GUIDED_DISMISS_KEY);
+      }
+    } catch {
+      // ignore
+    }
+    resumeGuidedAfterShiftModalClose.current = false;
+    resumeGuidedWhenHome.current = false;
+    setGuidedSetupOpen(true);
+  }
+
   function openAddEmployeeFromHeader() {
+    if (!guardAdmin("manage employees")) {
+      return;
+    }
     setActiveTab("employees");
   }
 
   function openInviteTeamFromHome() {
+    if (!guardAdmin("send team invites")) {
+      return;
+    }
     router.push("/invites");
   }
 
   function openPayrollOverviewFromHome() {
+    if (!guardAdmin("open payroll")) {
+      return;
+    }
     setActiveTab("payroll-overview");
   }
 
@@ -2497,6 +2742,9 @@ async function handleLogout() {
   }
 
   function openPeopleMenuTab(tab: AppTab) {
+    if (!guardAdmin("manage people")) {
+      return;
+    }
     setActiveTab(tab);
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
@@ -2508,6 +2756,9 @@ async function handleLogout() {
   }
 
   function openReportsMenuTab(tab: AppTab) {
+    if (!guardAdmin("open reports")) {
+      return;
+    }
     setActiveTab(tab);
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
@@ -2519,6 +2770,9 @@ async function handleLogout() {
   }
 
   function openPayrollSectionTab(tab: AppTab) {
+    if (!guardAdmin("open payroll")) {
+      return;
+    }
     setActiveTab(tab);
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
@@ -2533,6 +2787,9 @@ async function handleLogout() {
   }
 
   function openSettingsMenuRoute(path: string) {
+    if (!guardAdmin("open workspace settings")) {
+      return;
+    }
     router.push(path);
     setIsHomeMenuOpen(false);
     setIsScheduleMenuOpen(false);
@@ -2681,9 +2938,24 @@ async function handleLogout() {
             activeEmployees={activeEmployees}
             roleSuggestions={roleSuggestions}
             isFormEmployeeUnavailable={isFormEmployeeUnavailable}
+            dayAvailabilityByEmployee={shiftDayAvailabilityByEmployee}
             handleEmployeeChange={handleEmployeeChange}
             saveShift={saveShift}
             onDismiss={resetForm}
+          />
+        ) : null}
+
+        {isAdmin ? (
+          <GuidedWorkspaceSetup
+            open={guidedSetupOpen}
+            hasEmployeeGroups={employeeGroups.length > 0}
+            hasEmployees={hasEmployees}
+            hasShifts={hasShifts}
+            onDismiss={dismissGuidedSetup}
+            onCreateDefaultGroup={ensureDefaultEmployeeGroup}
+            onOpenEmployeeGroups={openEmployeeGroupsFromGuided}
+            onOpenEmployees={openEmployeesFromGuided}
+            onCreateShift={guidedCreateShift}
           />
         ) : null}
 
@@ -2884,7 +3156,7 @@ async function handleLogout() {
           </div>
         ) : null}
 
-        {activeTab === "home" && (
+        {activeTab === "home" && isAdmin ? (
           <HomeDashboardSection
             displayName={dashboardDisplayName}
             workspaceName={workspaceName}
@@ -2893,9 +3165,11 @@ async function handleLogout() {
             onCreateShift={openCreateShiftFromHeader}
             onInviteTeam={openInviteTeamFromHome}
             onReviewPayroll={openPayrollOverviewFromHome}
-            showPayrollCta={isAdmin}
+            showPayrollCta
+            showRunSetupGuide={!hasShifts}
+            onRunSetupGuide={openRunSetupGuideFromHome}
           />
-        )}
+        ) : null}
 
         {activeTab === "schedule" && (
   <ScheduleSection

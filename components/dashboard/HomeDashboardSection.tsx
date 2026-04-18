@@ -18,6 +18,9 @@ type HomeDashboardSectionProps = {
   onInviteTeam: () => void;
   onReviewPayroll: () => void;
   showPayrollCta: boolean;
+  /** When true, show a control to re-launch the first-time guided setup (admins only). */
+  showRunSetupGuide?: boolean;
+  onRunSetupGuide?: () => void;
 };
 
 function statusPill(status: SetupCard["status"]) {
@@ -45,6 +48,8 @@ export default function HomeDashboardSection({
   onInviteTeam,
   onReviewPayroll,
   showPayrollCta,
+  showRunSetupGuide = false,
+  onRunSetupGuide,
 }: HomeDashboardSectionProps) {
   const completedCount = setupCards.filter((card) => card.status === "completed").length;
   const progressPercent = Math.round((completedCount / setupCards.length) * 100);
@@ -129,6 +134,15 @@ export default function HomeDashboardSection({
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Review payroll
+            </button>
+          ) : null}
+          {showRunSetupGuide && onRunSetupGuide ? (
+            <button
+              type="button"
+              onClick={onRunSetupGuide}
+              className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-900 hover:bg-indigo-100"
+            >
+              Run setup guide
             </button>
           ) : null}
         </div>

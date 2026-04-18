@@ -1,5 +1,6 @@
 import Link from "next/link";
 import EmailConfirmationPolling from "../../../components/onboarding/EmailConfirmationPolling";
+import MarkGuidedSetupPending from "../../../components/onboarding/MarkGuidedSetupPending";
 import { resendOwnerConfirmation } from "./actions";
 
 type SuccessPageProps = {
@@ -63,12 +64,15 @@ export default async function CreateCompanySuccessPage({
 
         <div className="mt-6 space-y-3">
           {isExisting ? (
-            <Link
-              href="/"
-              className="block w-full rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
-            >
-              Go to workspace
-            </Link>
+            <>
+              <MarkGuidedSetupPending />
+              <Link
+                href="/?guided=1"
+                className="block w-full rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Go to workspace
+              </Link>
+            </>
           ) : (
             <>
               <a

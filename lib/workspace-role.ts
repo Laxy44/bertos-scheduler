@@ -11,3 +11,12 @@ export function isCompanyMemberRole(role: string | null | undefined): boolean {
   const r = (role || "").trim().toLowerCase();
   return ["owner", "admin", "manager", "employee"].includes(r);
 }
+
+/**
+ * Hard guard for mutation helpers shared across surfaces. Prefer user-facing `alert` in UI entrypoints.
+ */
+export function assertWorkspaceAdmin(isAdmin: boolean): void {
+  if (!isAdmin) {
+    throw new Error("Only workspace admins can perform this action.");
+  }
+}

@@ -4,6 +4,15 @@ import { getLinkedProfileEmployee } from "@/lib/profile-employee";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { maybeSendWelcomeEmailForUser } from "../lib/welcome-email-trigger";
 
+type PageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function readParam(value: string | string[] | undefined) {
+  if (!value) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}
+
 type ProfileRow = {
   role?: string | null;
   name?: string | null;
@@ -33,7 +42,10 @@ type CompanyMemberRow = {
     | null;
 };
 
-export default async function Page() {
+export default async function Page({ searchParams }: PageProps) {
+  const sp = searchParams ? await searchParams : {};
+  const launchGuidedSetup = readParam(sp.guided) === "1";
+
   const supabase = await createServerSupabaseClient();
 
   const {
@@ -132,6 +144,7 @@ export default async function Page() {
       companyWeekStartsOn={companyWeekStartsOn}
       companyCurrency={companyCurrency}
       companyDefaultHourlyWage={companyDefaultHourlyWage}
+      launchGuidedSetup={launchGuidedSetup}
     />
   );
 }

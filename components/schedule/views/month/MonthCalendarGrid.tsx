@@ -19,7 +19,6 @@ type MonthCalendarGridProps = {
   isAdmin: boolean;
   isReadOnly: boolean;
   onActivateDay: (date: string) => void;
-  onOpenDayDetails: (date: string) => void;
   onShiftSelect: (shift: ShiftLike) => void;
 };
 
@@ -32,7 +31,6 @@ export default function MonthCalendarGrid({
   isAdmin,
   isReadOnly,
   onActivateDay,
-  onOpenDayDetails,
   onShiftSelect,
 }: MonthCalendarGridProps) {
   return (
@@ -40,7 +38,7 @@ export default function MonthCalendarGrid({
       {days.map((d) => (
         <div
           key={d}
-          className="bg-slate-100 px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-slate-600 sm:px-3 sm:py-2.5 sm:text-[11px]"
+          className="border-b-2 border-slate-200 bg-slate-100 px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-slate-600 sm:px-3 sm:py-2.5 sm:text-[11px]"
         >
           {d.slice(0, 3)}
         </div>
@@ -57,7 +55,6 @@ export default function MonthCalendarGrid({
           isAdmin={isAdmin}
           isReadOnly={isReadOnly}
           onActivateDay={onActivateDay}
-          onOpenDayDetails={onOpenDayDetails}
           onShiftSelect={onShiftSelect}
         />
       ))}

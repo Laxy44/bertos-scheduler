@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getMonthCalendarDays } from "../../../lib/utils";
 import MonthCalendarGrid from "./month/MonthCalendarGrid";
 import MonthDayDetailsPanel from "./month/MonthDayDetailsPanel";
@@ -42,6 +42,10 @@ export default function MonthScheduleView({
 }: MonthScheduleViewProps) {
   const [detailsDate, setDetailsDate] = useState<string | null>(null);
 
+  useEffect(() => {
+    setDetailsDate(null);
+  }, [month, year]);
+
   const cells = useMemo(() => getMonthCalendarDays(month, year), [month, year]);
 
   const todayStr = useMemo(() => {
@@ -79,27 +83,18 @@ export default function MonthScheduleView({
     (date: string) => {
       onMonthSelectDay(date);
       const list = shiftsByDate.get(date) || [];
-      if (isAdmin && !isReadOnly) {
-        if (list.length === 0) {
-          onEmptyMonthDayQuickAdd(date);
-          return;
+      if (isReadOnly) {
+        if (list.length > 0) {
+          setDetailsDate(date);
         }
-        setDetailsDate(date);
         return;
       }
-      if (list.length > 0) {
-        setDetailsDate(date);
+      if (isAdmin) {
+        setDetailsDate(null);
+        onEmptyMonthDayQuickAdd(date);
       }
     },
     [isAdmin, isReadOnly, onMonthSelectDay, onEmptyMonthDayQuickAdd, shiftsByDate]
-  );
-
-  const handleOpenDayDetails = useCallback(
-    (date: string) => {
-      onMonthSelectDay(date);
-      setDetailsDate(date);
-    },
-    [onMonthSelectDay]
   );
 
   const handleShiftSelect = useCallback(
@@ -156,12 +151,11 @@ export default function MonthScheduleView({
           isAdmin={isAdmin}
           isReadOnly={isReadOnly}
           onActivateDay={handleActivateDay}
-          onOpenDayDetails={handleOpenDayDetails}
           onShiftSelect={handleShiftSelect}
         />
       </div>
 
-      {detailsDate ? (
+      {detailsDate && isReadOnly ? (
         <MonthDayDetailsPanel
           date={detailsDate}
           dateLabel={detailsLabel}

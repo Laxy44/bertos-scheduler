@@ -11,10 +11,53 @@ type ShiftFormModalProps = {
   activeEmployees: EmployeeConfig[];
   roleSuggestions: string[];
   isFormEmployeeUnavailable: boolean;
+  /** Per-employee availability for `form.date` (from `employee_availability`), when loaded for admins. */
+  dayAvailabilityByEmployee?: Record<string, string>;
   handleEmployeeChange: (name: string) => void;
   saveShift: () => Promise<void>;
   onDismiss: () => void;
 };
+
+function availabilityOptionSuffix(status: string | undefined): string {
+  if (!status) return "";
+  if (status === "can_work") return " — Can work";
+  if (status === "cannot_work") return " — Cannot work";
+  if (status === "undecided") return " — Undecided";
+  if (status === "none") return " — No linked account";
+  return "";
+}
+
+function availabilityPanel(
+  status: string | undefined
+): { label: string; className: string } | null {
+  if (!status) return null;
+  if (status === "can_work") {
+    return {
+      label: "Availability: can work on this day.",
+      className: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    };
+  }
+  if (status === "cannot_work") {
+    return {
+      label:
+        "Availability: marked cannot work. You can still save after confirming in the next step.",
+      className: "border-rose-200 bg-rose-50 text-rose-900",
+    };
+  }
+  if (status === "undecided") {
+    return {
+      label: "Availability: not set yet for this day (undecided).",
+      className: "border-slate-200 bg-slate-50 text-slate-800",
+    };
+  }
+  if (status === "none") {
+    return {
+      label: "No linked login for this employee — availability is not tracked.",
+      className: "border-slate-200 bg-slate-50 text-slate-700",
+    };
+  }
+  return null;
+}
 
 function formatHeaderDate(iso: string) {
   const [y, m, d] = iso.split("-").map(Number);
@@ -35,6 +78,7 @@ export default function ShiftFormModal({
   activeEmployees,
   roleSuggestions,
   isFormEmployeeUnavailable,
+  dayAvailabilityByEmployee = {},
   handleEmployeeChange,
   saveShift,
   onDismiss,
@@ -43,6 +87,12 @@ export default function ShiftFormModal({
   const [saving, setSaving] = useState(false);
 
   const roleListId = "shift-form-role-suggestions";
+
+  const selectedDayAvailability = dayAvailabilityByEmployee[form.employee];
+  const availabilityHint = useMemo(
+    () => availabilityPanel(selectedDayAvailability),
+    [selectedDayAvailability]
+  );
 
   const mergedRoleSuggestions = useMemo(() => {
     const s = new Set(roleSuggestions);
@@ -118,6 +168,11 @@ export default function ShiftFormModal({
                 This employee is marked unavailable on this date. Change the employee or date before saving.
               </div>
             ) : null}
+            {availabilityHint ? (
+              <div className={`rounded-lg border px-3 py-2 text-sm ${availabilityHint.className}`}>
+                {availabilityHint.label}
+              </div>
+            ) : null}
 
             <div>
               <label htmlFor="shift-form-employee" className="mb-1 block text-xs font-semibold text-slate-600">
@@ -135,6 +190,7 @@ export default function ShiftFormModal({
                 {activeEmployees.map((emp) => (
                   <option key={emp.name} value={emp.name}>
                     {emp.name}
+                    {availabilityOptionSuffix(dayAvailabilityByEmployee[emp.name])}
                   </option>
                 ))}
               </select>
