@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 
-import { saveProfileEmployeeAction, type ProfileEmployeeView } from "@/app/profile/actions";
+import { saveProfileEmployeeAction, type ProfileEmployeeView } from "@/app/app/profile/actions";
 
 type Props = {
   authEmail: string | null;
@@ -207,7 +207,7 @@ export default function ProfileForm({ authEmail, companyName, initialEmployee }:
                 {isPending ? "Saving…" : "Save changes"}
               </button>
               <Link
-                href="/"
+                href="/app"
                 className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline"
               >
                 Back to app

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 
-import { updateGeneralSettingsAction } from "@/app/settings/actions";
+import { updateGeneralSettingsAction } from "@/app/app/settings/actions";
 
 const timezones = [
   "Europe/Copenhagen",

@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 
-import { updateEmployeeWorkspaceSettingsAction, updateWorkspaceMemberRoleAction } from "@/app/settings/actions";
-import type { MemberRow } from "@/app/settings/actions";
+import { updateEmployeeWorkspaceSettingsAction, updateWorkspaceMemberRoleAction } from "@/app/app/settings/actions";
+import type { MemberRow } from "@/app/app/settings/actions";
 
 type Props = {
   initialShowEmail: boolean;

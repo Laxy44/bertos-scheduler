@@ -35,7 +35,7 @@ export default async function CreateCompanyPage({
   const isLoggedInWithoutMembership = Boolean(user && !membershipId);
 
   if (user && membershipId) {
-    redirect("/");
+    redirect("/app");
   }
 
   if (user && !membershipId && user.email) {

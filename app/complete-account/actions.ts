@@ -108,7 +108,7 @@ async function acceptInviteForUser(
       userId,
       email,
     });
-    redirect("/");
+    redirect("/app");
   }
 
   const insertMembership = await supabase.from("company_members").insert({
@@ -147,7 +147,7 @@ async function acceptInviteForUser(
     email,
   });
 
-  redirect("/");
+  redirect("/app");
 }
 
 async function getAuthenticatedUserWithSingleRetry(supabase: SupabaseClient) {

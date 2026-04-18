@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 
-import { updatePayrollSettingsAction } from "@/app/settings/actions";
+import { updatePayrollSettingsAction } from "@/app/app/settings/actions";
 
 const commonCurrencies = ["DKK", "EUR", "SEK", "NOK", "GBP", "USD"] as const;
 

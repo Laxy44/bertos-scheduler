@@ -9,7 +9,7 @@ export default function PunchClockPage() {
           This section is coming soon. We&apos;ve added this as a safe placeholder route.
         </p>
         <Link
-          href="/"
+          href="/app"
           className="mt-6 block w-full rounded-2xl bg-slate-900 px-4 py-3 text-center font-semibold text-white hover:bg-slate-800"
         >
           Back to dashboard

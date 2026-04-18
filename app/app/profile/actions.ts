@@ -152,8 +152,8 @@ export async function saveProfileEmployeeAction(input: {
     }
   }
 
-  revalidatePath("/");
-  revalidatePath("/profile");
+  revalidatePath("/app");
+  revalidatePath("/app/profile");
 
   return { ok: true, employee: mapEmployeeRowToView(updated.data as ProfileEmployeeRow) };
 }

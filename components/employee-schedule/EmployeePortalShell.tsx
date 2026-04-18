@@ -14,10 +14,10 @@ type EmployeePortalShellProps = {
 };
 
 const navLinks: { href: string; label: string }[] = [
-  { href: "/", label: "Home" },
-  { href: "/your-schedule", label: "Your schedule" },
-  { href: "/your-availability", label: "Your availability" },
-  { href: "/punch-clock", label: "Punch clock" },
+  { href: "/app", label: "Home" },
+  { href: "/app/your-schedule", label: "Your schedule" },
+  { href: "/app/your-availability", label: "Your availability" },
+  { href: "/app/punch-clock", label: "Punch clock" },
 ];
 
 /**
@@ -33,7 +33,7 @@ export default function EmployeePortalShell({
     <div className="min-h-screen bg-slate-100">
       <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950 text-slate-100 shadow-lg shadow-slate-950/20">
         <div className="flex h-14 w-full items-center justify-between px-4 xl:px-6">
-          <Link href="/" className="text-lg font-semibold tracking-tight text-white">
+          <Link href="/" className="text-lg font-semibold tracking-tight text-white" title="Planyo marketing site">
             Planyo
           </Link>
           <span className="max-w-[50%] truncate text-sm text-slate-300">{displayName}</span>

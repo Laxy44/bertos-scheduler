@@ -7,7 +7,7 @@ import {
   deleteShiftTypeAction,
   updateBreakRulesAction,
   updateShiftTypeAction,
-} from "@/app/settings/actions";
+} from "@/app/app/settings/actions";
 import type { ShiftTypeRow } from "@/lib/settings/workspace-settings";
 
 type Props = {

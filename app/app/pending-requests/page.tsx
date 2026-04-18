@@ -32,7 +32,7 @@ export default async function PendingRequestsPage() {
   const activeCompanyId = workspace.membership.company_id;
   const workspaceRole = (workspace.membership.role || "").trim();
   if (!isCompanyAdminRole(workspaceRole)) {
-    redirect("/your-schedule");
+    redirect("/app/your-schedule");
   }
 
   return (
@@ -46,7 +46,7 @@ export default async function PendingRequestsPage() {
             </p>
           </div>
           <Link
-            href="/"
+            href="/app"
             className="inline-flex w-fit items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
           >
             Back to workspace

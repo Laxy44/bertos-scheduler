@@ -37,7 +37,7 @@ export async function login(formData: FormData) {
     redirect(`/login?message=${encodeURIComponent(authErrorMessage(error.message))}`);
   }
 
-  redirect("/");
+  redirect("/app");
 }
 
 export async function sendPasswordReset(formData: FormData) {

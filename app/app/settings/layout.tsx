@@ -20,7 +20,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
             </div>
             <SettingsSubnav />
             <Link
-              href="/"
+              href="/app"
               className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
             >
               ← Back to app

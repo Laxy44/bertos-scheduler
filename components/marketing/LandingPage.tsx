@@ -1,11 +1,23 @@
 import Link from "next/link";
 
-export default function LandingPage() {
+type LandingPageProps = {
+  isAuthenticated?: boolean;
+};
+
+export default function LandingPage({ isAuthenticated = false }: LandingPageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 text-slate-900">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-4 py-6 md:px-8">
         <span className="text-xl font-bold tracking-tight text-slate-900">Planyo</span>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+          {isAuthenticated ? (
+            <Link
+              href="/app"
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+            >
+              Open workspace
+            </Link>
+          ) : null}
           <Link
             href="/login"
             className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"

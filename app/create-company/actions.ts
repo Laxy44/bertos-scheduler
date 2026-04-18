@@ -29,7 +29,7 @@ export async function createCompany(formData: FormData) {
   if (existingUser) {
     try {
       await createCompanyForUser(supabase, { id: existingUser.id }, companyName);
-      redirect("/");
+      redirect("/app");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to create company";
@@ -92,5 +92,5 @@ export async function createCompany(formData: FormData) {
     redirect(`/create-company?message=${encodeURIComponent(message)}`);
   }
 
-  redirect("/");
+  redirect("/app");
 }

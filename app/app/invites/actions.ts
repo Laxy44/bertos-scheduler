@@ -1,13 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "../../lib/supabase-server";
-import { getSiteUrlFromHeaders } from "../../lib/site-url-server";
-import { sendEmployeeInviteEmail } from "../../lib/invite-email";
+import { createServerSupabaseClient } from "../../../lib/supabase-server";
+import { getSiteUrlFromHeaders } from "../../../lib/site-url-server";
+import { sendEmployeeInviteEmail } from "../../../lib/invite-email";
 import {
   createPendingInviteAndSendEmail,
   type AppInviteRole,
-} from "../../lib/employee-invite-flow";
+} from "../../../lib/employee-invite-flow";
 
 type ActiveMembership = {
   company_id: string | null;
@@ -24,7 +24,7 @@ export async function createInvite(formData: FormData) {
   ) as AppInviteRole;
 
   if (!email) {
-    redirect("/invites?message=Employee email is required");
+    redirect("/app/invites?message=Employee email is required");
   }
 
   const {
@@ -51,10 +51,10 @@ export async function createInvite(formData: FormData) {
     if (result.error.startsWith("Create a company")) {
       redirect("/create-company?message=Create a company before inviting employees");
     }
-    redirect(`/invites?message=${encodeURIComponent(result.error)}`);
+    redirect(`/app/invites?message=${encodeURIComponent(result.error)}`);
   }
 
-  redirect("/invites?message=Invite created and email sent");
+  redirect("/app/invites?message=Invite created and email sent");
 }
 
 export async function cancelInvite(formData: FormData) {
@@ -62,7 +62,7 @@ export async function cancelInvite(formData: FormData) {
   const inviteId = String(formData.get("inviteId") || "").trim();
 
   if (!inviteId) {
-    redirect("/invites?message=Invite id is required");
+    redirect("/app/invites?message=Invite id is required");
   }
 
   const {
@@ -94,7 +94,7 @@ export async function cancelInvite(formData: FormData) {
 
   const allowedRoles = new Set(["owner", "admin"]);
   if (!allowedRoles.has((activeMembership.role || "").toLowerCase())) {
-    redirect("/invites?message=Only company owners or admins can manage invites");
+    redirect("/app/invites?message=Only company owners or admins can manage invites");
   }
 
   const revokeResult = await supabase
@@ -105,10 +105,10 @@ export async function cancelInvite(formData: FormData) {
     .eq("status", "pending");
 
   if (revokeResult.error) {
-    redirect(`/invites?message=${encodeURIComponent(revokeResult.error.message)}`);
+    redirect(`/app/invites?message=${encodeURIComponent(revokeResult.error.message)}`);
   }
 
-  redirect("/invites?message=Invite revoked");
+  redirect("/app/invites?message=Invite revoked");
 }
 
 export async function resendInvite(formData: FormData) {
@@ -118,7 +118,7 @@ export async function resendInvite(formData: FormData) {
   const origin = await getSiteUrlFromHeaders();
 
   if (!inviteId || !inviteEmail) {
-    redirect("/invites?message=Invite id and email are required");
+    redirect("/app/invites?message=Invite id and email are required");
   }
 
   const {
@@ -149,7 +149,7 @@ export async function resendInvite(formData: FormData) {
   const activeMembership = membership.data![0] as ActiveMembership;
   const allowedRoles = new Set(["owner", "admin"]);
   if (!allowedRoles.has((activeMembership.role || "").toLowerCase())) {
-    redirect("/invites?message=Only company owners or admins can manage invites");
+    redirect("/app/invites?message=Only company owners or admins can manage invites");
   }
 
   const invite = await supabase
@@ -163,13 +163,13 @@ export async function resendInvite(formData: FormData) {
     .maybeSingle<{ id: string }>();
 
   if (invite.error || !invite.data?.id) {
-    redirect("/invites?message=Pending invite not found");
+    redirect("/app/invites?message=Pending invite not found");
   }
 
   const resend = await sendEmployeeInviteEmail(inviteEmail, origin);
 
   if (resend.error) {
-    redirect(`/invites?message=Resend failed: ${encodeURIComponent(resend.error.message)}`);
+    redirect(`/app/invites?message=Resend failed: ${encodeURIComponent(resend.error.message)}`);
   }
 
   const extend = await supabase
@@ -183,5 +183,5 @@ export async function resendInvite(formData: FormData) {
     console.warn("[invites] could not extend invite expiry", extend.error.message);
   }
 
-  redirect("/invites?message=Invite email resent");
+  redirect("/app/invites?message=Invite email resent");
 }

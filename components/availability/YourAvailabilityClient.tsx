@@ -237,7 +237,7 @@ export default function YourAvailabilityClient({
   };
 
   return (
-    <EmployeePortalShell displayName={displayName} companyName={companyName} activeHref="/your-availability">
+    <EmployeePortalShell displayName={displayName} companyName={companyName} activeHref="/app/your-availability">
       <div className="space-y-5">
         <div className="border-b border-slate-200 pb-4">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Your availability</h1>

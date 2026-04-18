@@ -1,4 +1,4 @@
-import { getWorkspaceMembers } from "@/app/settings/actions";
+import { getWorkspaceMembers } from "@/app/app/settings/actions";
 import EmployeeSettingsForm from "@/components/settings/EmployeeSettingsForm";
 import { requireSettingsAdmin } from "@/lib/settings/require-settings-admin";
 

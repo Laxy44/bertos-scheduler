@@ -110,7 +110,7 @@ export default function WorkspaceAppNav({
             <button
               type="button"
               className={menuItem}
-              onClick={() => openUserMenuRoute("/profile")}
+              onClick={() => openUserMenuRoute("/app/profile")}
             >
               Profile
             </button>
@@ -144,13 +144,13 @@ export default function WorkspaceAppNav({
             <button type="button" className={menuItem} onClick={() => openHomeMenuTab("home")}>
               Dashboard
             </button>
-            <button type="button" className={menuItem} onClick={() => openHomeMenuRoute("/your-schedule")}>
+            <button type="button" className={menuItem} onClick={() => openHomeMenuRoute("/app/your-schedule")}>
               Your schedule
             </button>
             <button
               type="button"
               className={menuItem}
-              onClick={() => openHomeMenuRoute("/your-availability")}
+              onClick={() => openHomeMenuRoute("/app/your-availability")}
             >
               Your availability
             </button>
@@ -186,14 +186,14 @@ export default function WorkspaceAppNav({
                 <button
                   type="button"
                   className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/pending-requests")}
+                  onClick={() => openScheduleMenuRoute("/app/pending-requests")}
                 >
                   Pending requests
                 </button>
                 <button
                   type="button"
                   className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/punch-clock")}
+                  onClick={() => openScheduleMenuRoute("/app/punch-clock")}
                 >
                   Punch clock
                 </button>
@@ -203,14 +203,14 @@ export default function WorkspaceAppNav({
                 <button
                   type="button"
                   className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/your-schedule")}
+                  onClick={() => openScheduleMenuRoute("/app/your-schedule")}
                 >
                   Your schedule
                 </button>
                 <button
                   type="button"
                   className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/punch-clock")}
+                  onClick={() => openScheduleMenuRoute("/app/punch-clock")}
                 >
                   Punch clock
                 </button>
@@ -361,35 +361,35 @@ export default function WorkspaceAppNav({
               <button
                 type="button"
                 className={menuItem}
-                onClick={() => openSettingsMenuRoute("/settings/general")}
+                onClick={() => openSettingsMenuRoute("/app/settings/general")}
               >
                 General
               </button>
               <button
                 type="button"
                 className={menuItem}
-                onClick={() => openSettingsMenuRoute("/settings/schedule")}
+                onClick={() => openSettingsMenuRoute("/app/settings/schedule")}
               >
                 Schedule
               </button>
               <button
                 type="button"
                 className={menuItem}
-                onClick={() => openSettingsMenuRoute("/settings/employees")}
+                onClick={() => openSettingsMenuRoute("/app/settings/employees")}
               >
                 Employees
               </button>
               <button
                 type="button"
                 className={menuItem}
-                onClick={() => openSettingsMenuRoute("/settings/payroll")}
+                onClick={() => openSettingsMenuRoute("/app/settings/payroll")}
               >
                 Payroll
               </button>
               <button
                 type="button"
                 className={menuItem}
-                onClick={() => openSettingsMenuRoute("/settings/security")}
+                onClick={() => openSettingsMenuRoute("/app/settings/security")}
               >
                 Security
               </button>

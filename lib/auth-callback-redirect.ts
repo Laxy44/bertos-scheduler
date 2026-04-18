@@ -124,7 +124,7 @@ export async function resolveAuthCallbackDestination(
     .maybeSingle<{ company_id: string | null }>();
 
   if (!membership.error && membership.data?.company_id) {
-    return "/";
+    return "/app";
   }
 
   const authEmail = (user.email || "").trim().toLowerCase();

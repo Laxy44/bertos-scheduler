@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { href: "/settings/general", label: "General" },
-  { href: "/settings/schedule", label: "Schedule" },
-  { href: "/settings/employees", label: "Employees" },
-  { href: "/settings/payroll", label: "Payroll" },
-  { href: "/settings/security", label: "Security" },
+  { href: "/app/settings/general", label: "General" },
+  { href: "/app/settings/schedule", label: "Schedule" },
+  { href: "/app/settings/employees", label: "Employees" },
+  { href: "/app/settings/payroll", label: "Payroll" },
+  { href: "/app/settings/security", label: "Security" },
 ] as const;
 
 const base =

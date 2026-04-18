@@ -2626,7 +2626,7 @@ export default function AppShell({
     if (!guardAdmin("send team invites")) {
       return;
     }
-    router.push("/invites");
+    router.push("/app/invites");
   }
 
   function openPayrollOverviewFromHome() {
@@ -2935,7 +2935,7 @@ export default function AppShell({
                 ) : null}
                 {normalizedRole === "owner" ? (
                   <Link
-                    href="/invites"
+                    href="/app/invites"
                     className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
                   >
                     Invite

@@ -67,7 +67,7 @@ export default async function CreateCompanySuccessPage({
             <>
               <MarkGuidedSetupPending />
               <Link
-                href="/?guided=1"
+                href="/app?guided=1"
                 className="block w-full rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
               >
                 Go to workspace

@@ -49,8 +49,8 @@ export async function updateGeneralSettingsAction(input: {
     }
     return { ok: false, error: error.message };
   }
-  revalidatePath("/");
-  revalidatePath("/settings");
+  revalidatePath("/app");
+  revalidatePath("/app/settings");
   return { ok: true };
 }
 
@@ -91,8 +91,8 @@ export async function updatePayrollSettingsAction(input: {
     }
     return { ok: false, error: error.message };
   }
-  revalidatePath("/");
-  revalidatePath("/settings");
+  revalidatePath("/app");
+  revalidatePath("/app/settings");
   return { ok: true };
 }
 
@@ -132,7 +132,7 @@ export async function updateScheduleSettingsAction(input: {
     }
     return { ok: false, error: error.message };
   }
-  revalidatePath("/settings");
+  revalidatePath("/app/settings");
   return { ok: true };
 }
 
@@ -201,7 +201,7 @@ export async function updateEmployeeWorkspaceSettingsAction(
     .update({ workspace_settings: next })
     .eq("id", companyId);
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/settings");
+  revalidatePath("/app/settings");
   return { ok: true };
 }
 
@@ -279,7 +279,7 @@ export async function updateWorkspaceMemberRoleAction(input: {
     .eq("status", "active");
 
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/");
-  revalidatePath("/settings");
+  revalidatePath("/app");
+  revalidatePath("/app/settings");
   return { ok: true };
 }

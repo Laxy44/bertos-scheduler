@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCachedWorkspaceForUser } from "@/lib/cached-workspace-load";
-import { createServerSupabaseClient } from "../../lib/supabase-server";
+import { createServerSupabaseClient } from "../../../lib/supabase-server";
 import { cancelInvite, createInvite, resendInvite } from "./actions";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -41,7 +41,7 @@ export default async function InvitesPage({
 
   const role = (activeMembership.role || "").toLowerCase();
   if (!["owner", "admin"].includes(role)) {
-    redirect("/?message=Only company owners or admins can manage invites");
+    redirect("/app?message=Only company owners or admins can manage invites");
   }
 
   const pendingInvites = await supabase
@@ -140,7 +140,7 @@ export default async function InvitesPage({
         </div>
 
         <Link
-          href="/"
+          href="/app"
           className="mt-4 block text-center text-sm font-medium text-slate-600 hover:text-slate-900"
         >
           Back to dashboard

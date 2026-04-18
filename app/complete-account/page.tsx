@@ -41,7 +41,7 @@ export default async function CompleteAccountPage({
 
   const activeMembership = user ? await getActiveMembership(supabase, user.id) : null;
   if (activeMembership) {
-    redirect("/");
+    redirect("/app");
   }
 
   return (

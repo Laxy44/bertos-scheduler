@@ -15,7 +15,7 @@ export default async function AccountReadyPage() {
   if (user) {
     const companyId = await getActiveMembership(supabase, user.id);
     if (companyId) {
-      redirect("/");
+      redirect("/app");
     }
   }
 

@@ -9,6 +9,7 @@ export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   const loginMode = searchParams.get("mode");
   const isRecoveryMode = pathname === "/login" && loginMode === "recovery";
+  const isAppPath = pathname === "/app" || pathname.startsWith("/app/");
   const isPublicPath =
     pathname === "/" ||
     pathname.startsWith("/login") ||
@@ -105,7 +106,7 @@ export async function proxy(request: NextRequest) {
 
     const activeMemberships = memberships.error ? [] : memberships.data || [];
     // Do not block password reset or invite completion when the user has multiple workspaces.
-    if (activeMemberships.length > 1 && !isAuthCompletionPath) {
+    if (activeMemberships.length > 1 && !isAuthCompletionPath && pathname !== "/") {
       const conflictUrl = request.nextUrl.clone();
       conflictUrl.pathname = "/workspace-conflict";
       conflictUrl.search = "";
@@ -123,7 +124,7 @@ export async function proxy(request: NextRequest) {
 
     if (pathname === "/login" && !isRecoveryMode) {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = hasActiveCompany ? "/" : "/create-company";
+      redirectUrl.pathname = hasActiveCompany ? "/app" : "/create-company";
       redirectUrl.search = "";
       authDebug("proxy redirect", {
         reason: "logged-in on /login",
@@ -140,7 +141,8 @@ export async function proxy(request: NextRequest) {
       !isCompleteAccountPath &&
       !isInviteRecoveryPath &&
       !isResetPasswordPath &&
-      !isAuthCallbackPath
+      !isAuthCallbackPath &&
+      pathname !== "/"
     ) {
       const createCompanyUrl = request.nextUrl.clone();
       createCompanyUrl.pathname = "/create-company";
@@ -158,12 +160,12 @@ export async function proxy(request: NextRequest) {
       (isCreateCompanyPath || isJoinInvitePath || isCompleteAccountPath || isInviteRecoveryPath)
     ) {
       const homeUrl = request.nextUrl.clone();
-      homeUrl.pathname = "/";
+      homeUrl.pathname = "/app";
       homeUrl.search = "";
       authDebug("proxy redirect", {
         reason: "has company on onboarding/auth path",
         from: pathname,
-        to: "/",
+        to: "/app",
       });
       return NextResponse.redirect(homeUrl);
     }
@@ -173,7 +175,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (proxyWorkspaceCompanyId) {
+  if (proxyWorkspaceCompanyId && isAppPath) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set(WORKSPACE_PROXY_COMPANY_HEADER, proxyWorkspaceCompanyId);
     const withHint = NextResponse.next({ request: { headers: requestHeaders } });

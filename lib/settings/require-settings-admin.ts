@@ -48,7 +48,7 @@ export async function requireSettingsAdmin(): Promise<SettingsAdminContext> {
   const companyId = workspace.membership.company_id;
   const membershipRole = (workspace.membership.role || "").trim();
   if (!isCompanyAdminRole(membershipRole)) {
-    redirect("/?message=Only workspace admins can change settings");
+    redirect("/app?message=Only workspace admins can change settings");
   }
 
   const companyRes = await supabase
@@ -61,11 +61,11 @@ export async function requireSettingsAdmin(): Promise<SettingsAdminContext> {
 
   if (companyRes.error) {
     console.error("[settings] company", companyRes.error.message);
-    redirect("/?message=Could not load workspace");
+    redirect("/app?message=Could not load workspace");
   }
 
   if (!companyRes.data) {
-    redirect("/?message=Could not load workspace");
+    redirect("/app?message=Could not load workspace");
   }
 
   const company = companyRes.data;

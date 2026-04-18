@@ -67,7 +67,7 @@ export default function EmailConfirmationPolling({
 
       timeoutRef.current = window.setTimeout(() => {
         if (cancelled) return;
-        router.replace(session ? "/" : "/login?confirmed=1");
+        router.replace(session ? "/app" : "/login?confirmed=1");
       }, 650);
     };
 
