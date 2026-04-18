@@ -43,13 +43,18 @@ export default function MonthDayCell({
   const hasShifts = dayShifts.length > 0;
 
   const emptyAdmin = isAdmin && !isReadOnly && !hasShifts;
-  const cellCursor = "cursor-pointer";
+  const cellCursor = isReadOnly && !hasShifts ? "cursor-default" : "cursor-pointer";
+  const canActivate = !isReadOnly || hasShifts;
 
   return (
     <div
-      tabIndex={0}
-      onClick={() => onActivateDay(cell.date)}
+      tabIndex={canActivate ? 0 : -1}
+      onClick={() => {
+        if (!canActivate) return;
+        onActivateDay(cell.date);
+      }}
       onKeyDown={(e) => {
+        if (!canActivate) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onActivateDay(cell.date);
@@ -64,7 +69,7 @@ export default function MonthDayCell({
       } ${
         emptyAdmin
           ? "hover:bg-sky-50/80 hover:ring-1 hover:ring-inset hover:ring-sky-200/80"
-          : hasShifts || isReadOnly
+          : hasShifts
             ? "hover:bg-slate-50/95"
             : ""
       }`}

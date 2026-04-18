@@ -9,6 +9,7 @@ import {
   snapAnchorForView,
   type ScheduleViewKind,
 } from "../../lib/schedule-view-utils";
+import { buildPlannerShiftHandlers } from "../../lib/schedule-planner-handlers";
 import { addDays, fromDateInputValue, getMonthCalendarDays, getWeekDates, startOfWeek, toDateInputValue } from "../../lib/utils";
 import ScheduleControls from "./ScheduleControls";
 import PlannerSubTabsRow from "./PlannerSubTabsRow";
@@ -210,6 +211,42 @@ export default function SchedulePage(props: any) {
         )
       : employeeNames.filter((name: string) => name === employeeFilter);
 
+  const { openQuickAddForCell, openShiftFromGrid, onEmptyMonthDayQuickAdd } = useMemo(
+    () =>
+      buildPlannerShiftHandlers({
+        isReadOnly,
+        isAdmin,
+        employeeName: employeeName || "",
+        scheduleGridEmployees,
+        employees,
+        employeeRoleMap,
+        setSelectedDate,
+        setShiftRoleMode,
+        setEditingId,
+        setForm,
+        setOpenMenuId,
+        setShowShiftForm,
+        startEdit,
+        onCreateShiftCta,
+      }),
+    [
+      isReadOnly,
+      isAdmin,
+      employeeName,
+      scheduleGridEmployees,
+      employees,
+      employeeRoleMap,
+      setSelectedDate,
+      setShiftRoleMode,
+      setEditingId,
+      setForm,
+      setOpenMenuId,
+      setShowShiftForm,
+      startEdit,
+      onCreateShiftCta,
+    ]
+  );
+
   const weekRangeLabel = formatScheduleRangeLabel(scheduleView, navigatorAnchor, monthNames);
 
   const visiblePeriodShifts = gridShifts.filter((shift: any) => visibleDateSet.has(shift.date));
@@ -242,37 +279,6 @@ export default function SchedulePage(props: any) {
   const self = (employeeName || "").trim();
   const isOwnShift = (shift: any) => Boolean(self) && shift.employee === self;
 
-  const openQuickAddForCell = (employeeNameValue: string, date: string, employeeInfo: any) => {
-    if (isReadOnly) return;
-    setSelectedDate(date);
-    setShiftRoleMode("preset");
-    setEditingId(null);
-    setForm((current: any) => ({
-      ...current,
-      employee: employeeNameValue,
-      date,
-      role: employeeRoleMap[employeeNameValue] || employeeInfo?.defaultRole || current.role,
-      start: current.start || "09:00",
-      end: current.end || "17:00",
-    }));
-    setOpenMenuId(null);
-    setShowShiftForm(true);
-  };
-
-  const openShiftFromGrid = (shift: any) => {
-    if (isReadOnly) return;
-    if (!isAdmin && !isOwnShift(shift)) return;
-    if (isAdmin) {
-      setSelectedDate(shift.date);
-      startEdit(shift);
-      setOpenMenuId(null);
-      setShowShiftForm(true);
-      return;
-    }
-    setSelectedDate(shift.date);
-    setOpenMenuId(null);
-  };
-
   const onPickMonthCalendarDate = useCallback(
     (date: string) => {
       const d = fromDateInputValue(date);
@@ -284,17 +290,6 @@ export default function SchedulePage(props: any) {
     },
     [safeSetWeekStart, setSelectedDate, setForm, setOpenMenuId]
   );
-
-  function handleEmptyMonthDayQuickAdd(date: string) {
-    if (isReadOnly) return;
-    const name = scheduleGridEmployees[0];
-    if (!name) {
-      onCreateShiftCta();
-      return;
-    }
-    const info = employees.find((e: any) => e.name === name);
-    openQuickAddForCell(name, date, info || {});
-  }
 
   const kpiCardClass = isReadOnly
     ? "flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200/90 bg-slate-50 px-4 py-3 shadow-sm"
@@ -356,7 +351,7 @@ export default function SchedulePage(props: any) {
         onAddEmployeeCta={onAddEmployeeCta}
         openQuickAddForCell={openQuickAddForCell}
         openShiftFromGrid={openShiftFromGrid}
-        onEmptyMonthDayQuickAdd={handleEmptyMonthDayQuickAdd}
+        onEmptyMonthDayQuickAdd={onEmptyMonthDayQuickAdd}
       />
 
       <div className="w-full">

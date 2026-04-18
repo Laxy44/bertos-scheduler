@@ -78,14 +78,18 @@ export default function MonthScheduleView({
   const handleActivateDay = useCallback(
     (date: string) => {
       onMonthSelectDay(date);
+      const list = shiftsByDate.get(date) || [];
       if (isAdmin && !isReadOnly) {
-        const list = shiftsByDate.get(date) || [];
         if (list.length === 0) {
           onEmptyMonthDayQuickAdd(date);
           return;
         }
+        setDetailsDate(date);
+        return;
       }
-      setDetailsDate(date);
+      if (list.length > 0) {
+        setDetailsDate(date);
+      }
     },
     [isAdmin, isReadOnly, onMonthSelectDay, onEmptyMonthDayQuickAdd, shiftsByDate]
   );

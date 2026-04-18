@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "../../lib/supabase";
 import ScheduleSection from "../schedule/ScheduleSection";
+import ShiftFormModal from "../schedule/ShiftFormModal";
 import WorkspaceAppNav from "./WorkspaceAppNav";
 import WeekSection from "../schedule/WeekSection";
 import MonthSection from "../month/MonthSection";
@@ -39,7 +40,6 @@ import {
   fromDateInputValue,
   getCurrentTimeString,
   getDayNameFromDate,
-  getMonthCalendarDays,
   getPlannedHours,
   getWeekDates,
   getWorkedHours,
@@ -479,6 +479,29 @@ async function handleLogout() {
     });
   }, [shifts, selectedDate, employeeFilter]);
 
+  const scheduleGridEmployees = useMemo(
+    () =>
+      employeeFilter === "All"
+        ? employeeNames.filter((name) =>
+            employees.some((employee) => employee.name === name && employee.active)
+          )
+        : employeeNames.filter((name) => name === employeeFilter),
+    [employeeFilter, employeeNames, employees]
+  );
+
+  const onMonthPlannerSelectDay = useCallback(
+    (date: string) => {
+      const d = fromDateInputValue(date);
+      setMonthFilter(d.getMonth() + 1);
+      setYearFilter(d.getFullYear());
+      setSelectedDate(date);
+      setForm((current) => ({ ...current, date }));
+      setOpenMenuId(null);
+      setWeekStart(startOfWeek(d));
+    },
+    [setForm, setOpenMenuId]
+  );
+
   const selectedDateTotals = useMemo(() => {
     const totals: Record<string, { planned: number; worked: number }> = {};
     for (const employee of employeeNames) {
@@ -666,18 +689,6 @@ async function handleLogout() {
     });
     return Array.from(years).sort((a, b) => b - a);
   }, [shifts, currentYear]);
-
-  const monthCalendarDays = useMemo(() => {
-    return getMonthCalendarDays(monthFilter, yearFilter);
-  }, [monthFilter, yearFilter]);
-
-  const monthGroupedWeeks = useMemo(() => {
-    const groups: typeof monthCalendarDays[] = [];
-    for (let i = 0; i < monthCalendarDays.length; i += 7) {
-      groups.push(monthCalendarDays.slice(i, i + 7));
-    }
-    return groups;
-  }, [monthCalendarDays]);
 
   const selectedTimesheetRows = useMemo(() => {
     return shifts
@@ -1789,13 +1800,6 @@ async function handleLogout() {
     }
   }
 
-  function goToDate(date: string) {
-    setSelectedDate(date);
-    setWeekStart(startOfWeek(fromDateInputValue(date)));
-    setForm((current) => ({ ...current, date }));
-    setActiveTab("schedule");
-  }
-
   function downloadPayrollCsv() {
     const rows = [
       ["Company", workspaceName],
@@ -2487,6 +2491,21 @@ async function handleLogout() {
         onLogout={handleLogout}
       />
 
+        {isAdmin && showShiftForm ? (
+          <ShiftFormModal
+            workspaceName={workspaceName}
+            form={form}
+            setForm={setForm}
+            editingId={editingId}
+            activeEmployees={activeEmployees}
+            roleSuggestions={roleSuggestions}
+            isFormEmployeeUnavailable={isFormEmployeeUnavailable}
+            handleEmployeeChange={handleEmployeeChange}
+            saveShift={saveShift}
+            onDismiss={resetForm}
+          />
+        ) : null}
+
         <div className="flex w-full flex-1 flex-col px-4 pb-10 pt-4 xl:px-6 2xl:px-8">
         {/* B + C — dashboard hero + actions/stats (home only) */}
         {activeTab === "home" ? (
@@ -2780,27 +2799,38 @@ async function handleLogout() {
             
           
         {activeTab === "month" && (
-  <MonthSection
-    monthFilter={monthFilter}
-    setMonthFilter={setMonthFilter}
-    yearFilter={yearFilter}
-    setYearFilter={setYearFilter}
-    yearsAvailable={yearsAvailable}
-    monthlyTotalPlanned={monthlyTotalPlanned}
-    monthlyTotalWorked={monthlyTotalWorked}
-    shifts={shifts}
-    monthGroupedWeeks={monthGroupedWeeks}
-    getPlannedHours={getPlannedHours}
-    getWorkedHours={getWorkedHours}
-    roleStyles={roleStyles}
-    goToDate={goToDate}
-    employeeNames={employeeNames}
-    employees={employees}
-    monthlyHours={monthlyHours}
-    formatHours={formatHours}
-    employeeName={employeeName}
-  />
-)}
+          <MonthSection
+            monthFilter={monthFilter}
+            setMonthFilter={setMonthFilter}
+            yearFilter={yearFilter}
+            setYearFilter={setYearFilter}
+            yearsAvailable={yearsAvailable}
+            monthlyTotalPlanned={monthlyTotalPlanned}
+            monthlyTotalWorked={monthlyTotalWorked}
+            shifts={shifts}
+            getPlannedHours={getPlannedHours}
+            getWorkedHours={getWorkedHours}
+            employeeNames={employeeNames}
+            employees={employees}
+            monthlyHours={monthlyHours}
+            formatHours={formatHours}
+            employeeName={employeeName}
+            monthNames={monthNames}
+            selectedDate={selectedDate}
+            onMonthPlannerSelectDay={onMonthPlannerSelectDay}
+            isAdmin={isAdmin}
+            scheduleGridEmployees={scheduleGridEmployees}
+            employeeRoleMap={employeeRoleMap}
+            setSelectedDate={setSelectedDate}
+            setForm={setForm}
+            setOpenMenuId={setOpenMenuId}
+            setEditingId={setEditingId}
+            setShiftRoleMode={setShiftRoleMode}
+            setShowShiftForm={setShowShiftForm}
+            startEdit={startEdit}
+            onCreateShiftCta={openCreateShiftFromHeader}
+          />
+        )}
             
         {isAdmin && activeTab === "payroll" && (
   <PayrollSection

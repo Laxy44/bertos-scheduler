@@ -74,7 +74,10 @@ export default function ShiftMiniCard({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
       className={`w-full rounded-lg border px-2.5 py-1.5 text-left text-sm shadow-sm transition ${
         disabled ? "cursor-default" : "hover:border-slate-300"
       } ${

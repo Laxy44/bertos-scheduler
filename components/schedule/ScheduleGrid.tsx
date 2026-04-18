@@ -388,9 +388,10 @@ export default function ScheduleGrid({
                                     event.stopPropagation();
                                     openQuickAddForCell(employeeNameValue, item.date, employeeInfo);
                                   }}
-                                  className="w-fit rounded-full border border-dashed border-slate-300 px-3 py-1 text-[11px] font-semibold text-slate-500 opacity-0 transition group-hover:opacity-100 hover:border-slate-400 hover:bg-slate-100"
+                                  className="mt-2 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-indigo-600 text-xl font-light leading-none text-white shadow-md transition hover:bg-indigo-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
+                                  aria-label={`Create shift for ${employeeNameValue} on ${item.date}`}
                                 >
-                                  + Add shift
+                                  +
                                 </button>
                               ) : null}
                             </div>
