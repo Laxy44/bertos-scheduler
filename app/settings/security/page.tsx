@@ -30,16 +30,14 @@ export default async function SecuritySettingsPage() {
           Change password
         </Link>
         <Link
-          href="/account"
+          href="/profile"
           className="inline-flex justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
         >
-          Account
+          Profile
         </Link>
       </div>
 
-      <p className="mt-6 text-xs text-slate-400">
-        Multi-factor authentication and SSO can be layered in later without changing this page layout.
-      </p>
+      <p className="mt-6 text-xs text-slate-400">Use a strong, unique password for this workspace.</p>
     </section>
   );
 }
