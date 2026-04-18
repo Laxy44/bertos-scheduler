@@ -255,7 +255,11 @@ export default function WorkspaceAppNav({
               type="button"
               onClick={onTogglePeopleMenu}
               className={`${navBtn} ${
-                activeTab === "employees" || isPeopleMenuOpen ? navBtnActive : navBtnIdle
+                activeTab === "employees" ||
+                activeTab === "employee-groups" ||
+                isPeopleMenuOpen
+                  ? navBtnActive
+                  : navBtnIdle
               }`}
             >
               People <span className="text-[10px] opacity-70">▾</span>
@@ -275,17 +279,16 @@ export default function WorkspaceAppNav({
               >
                 Employees
               </button>
-              <button type="button" className={`${menuItem} text-slate-400`} disabled>
+              <button
+                type="button"
+                className={`${menuItem} ${
+                  activeTab === "employee-groups"
+                    ? "bg-slate-100 font-semibold text-slate-900"
+                    : ""
+                }`}
+                onClick={() => openPeopleMenuTab("employee-groups")}
+              >
                 Employee groups
-              </button>
-              <button type="button" className={`${menuItem} text-slate-400`} disabled>
-                Departments
-              </button>
-              <button type="button" className={`${menuItem} text-slate-400`} disabled>
-                Contracts
-              </button>
-              <button type="button" className={`${menuItem} text-slate-400`} disabled>
-                Documents
               </button>
             </AnchoredMenu>
           </div>
@@ -297,37 +300,42 @@ export default function WorkspaceAppNav({
               type="button"
               onClick={onTogglePayrollMenu}
               className={`${navBtn} ${
-                activeTab === "payroll" || isPayrollMenuOpen ? navBtnActive : navBtnIdle
+                activeTab === "reports-timesheets" ||
+                activeTab === "reports-payroll" ||
+                isPayrollMenuOpen
+                  ? navBtnActive
+                  : navBtnIdle
               }`}
             >
-              Payroll <span className="text-[10px] opacity-70">▾</span>
+              Reports <span className="text-[10px] opacity-70">▾</span>
             </button>
             <AnchoredMenu
               open={isPayrollMenuOpen}
               onClose={closeAllNavMenus}
               anchorRef={payrollRef}
-              contentClassName="w-64"
+              contentClassName="w-56"
             >
               <button
                 type="button"
-                className={menuItem}
-                onClick={() => openPayrollMenuTab("payroll")}
+                className={`${menuItem} ${
+                  activeTab === "reports-timesheets"
+                    ? "bg-slate-100 font-semibold text-slate-900"
+                    : ""
+                }`}
+                onClick={() => openPayrollMenuTab("reports-timesheets")}
               >
-                Payroll report
+                Timesheets
               </button>
               <button
                 type="button"
-                className={menuItem}
-                onClick={() => openPayrollMenuRoute("/payroll/lock-date-range")}
+                className={`${menuItem} ${
+                  activeTab === "reports-payroll"
+                    ? "bg-slate-100 font-semibold text-slate-900"
+                    : ""
+                }`}
+                onClick={() => openPayrollMenuTab("reports-payroll")}
               >
-                Lock date range for payroll
-              </button>
-              <button
-                type="button"
-                className={menuItem}
-                onClick={() => openPayrollMenuRoute("/payroll/import-payslips")}
-              >
-                Import payslips
+                Payroll summary
               </button>
             </AnchoredMenu>
           </div>
@@ -383,6 +391,20 @@ export default function WorkspaceAppNav({
                   onClick={() => openSettingsMenuRoute("/settings/integrations")}
                 >
                   Integrations
+                </button>
+                <button
+                  type="button"
+                  className={menuItem}
+                  onClick={() => openPayrollMenuRoute("/payroll/lock-date-range")}
+                >
+                  Lock payroll period
+                </button>
+                <button
+                  type="button"
+                  className={menuItem}
+                  onClick={() => openPayrollMenuRoute("/payroll/import-payslips")}
+                >
+                  Import payslips
                 </button>
               </>
             ) : (

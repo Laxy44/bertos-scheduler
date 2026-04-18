@@ -9,8 +9,18 @@ import ShiftFormModal from "../schedule/ShiftFormModal";
 import WorkspaceAppNav from "./WorkspaceAppNav";
 import WeekSection from "../schedule/WeekSection";
 import MonthSection from "../month/MonthSection";
-import PayrollSection from "../payroll/PayrollSection";
+import TimesheetsReport from "../reports/TimesheetsReport";
+import PayrollSummaryReport, {
+  type PayrollSummaryRow,
+} from "../reports/PayrollSummaryReport";
+import { calendarMonthRange } from "../../lib/reports/date-range";
+import {
+  reportEndDisplay,
+  reportHoursForShift,
+  reportStartDisplay,
+} from "../../lib/reports/shift-hours-cost";
 import EmployeesSection from "../employees/EmployeesSection";
+import EmployeeGroupsSection from "../people/EmployeeGroupsSection";
 import HomeDashboardSection, { type SetupCard } from "../dashboard/HomeDashboardSection";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -18,9 +28,9 @@ import Link from "next/link";
 
 
 import type {
-  
   AppTab,
   EmployeeConfig,
+  EmployeeGroupRow,
   FormState,
   NewEmployeeForm,
   Shift,
@@ -108,6 +118,31 @@ export default function AppShell({
   const supabase = createClient();
   const router = useRouter();
 
+  const loadEmployeeGroups = useCallback(async () => {
+    if (!activeCompanyId || !isAdmin) {
+      setEmployeeGroups([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("employee_groups")
+      .select("id, name, hourly_wage")
+      .eq("company_id", activeCompanyId)
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.log("Error fetching employee groups:", error);
+      return;
+    }
+
+    setEmployeeGroups(
+      (data || []).map((row: { id: string; name: string; hourly_wage: number | null }) => ({
+        id: row.id,
+        name: row.name,
+        hourlyWage: row.hourly_wage != null ? Number(row.hourly_wage) : null,
+      }))
+    );
+  }, [activeCompanyId, isAdmin, supabase]);
+
 async function handleLogout() {
   await supabase.auth.signOut();
   router.push("/login");
@@ -125,6 +160,7 @@ async function handleLogout() {
   const [activeTab, setActiveTab] = useState<AppTab>("home");
   const [employees, setEmployees] =
     useState<EmployeeConfig[]>([]);
+  const [employeeGroups, setEmployeeGroups] = useState<EmployeeGroupRow[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [isHomeMenuOpen, setIsHomeMenuOpen] = useState(false);
@@ -173,6 +209,7 @@ async function handleLogout() {
         defaultRole: emp.default_role,
         unavailableDates: Array.isArray(emp.unavailable_dates) ? emp.unavailable_dates : [],
         active: emp.active,
+        groupId: (emp as { employee_group_id?: string | null }).employee_group_id ?? null,
       }));
 
       if (!isAdmin) {
@@ -231,10 +268,17 @@ async function handleLogout() {
 
     void fetchEmployees();
     void fetchShifts();
-  }, [activeCompanyId, supabase, isAdmin, employeeName, authUserId]);
+    void loadEmployeeGroups();
+  }, [activeCompanyId, supabase, isAdmin, employeeName, authUserId, loadEmployeeGroups]);
 
   useEffect(() => {
-    if (!isAdmin && (activeTab === "payroll" || activeTab === "employees")) {
+    if (
+      !isAdmin &&
+      (activeTab === "reports-timesheets" ||
+        activeTab === "reports-payroll" ||
+        activeTab === "employees" ||
+        activeTab === "employee-groups")
+    ) {
       setActiveTab("schedule");
     }
   }, [isAdmin, activeTab]);
@@ -340,7 +384,16 @@ async function handleLogout() {
   const [newEmployeeForm, setNewEmployeeForm] = useState<NewEmployeeForm>(
     defaultNewEmployeeForm
   );
-  const [timesheetEmployee, setTimesheetEmployee] = useState(employeeName || "");
+  const [reportTimesheetFrom, setReportTimesheetFrom] = useState(() => {
+    const { from } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
+    return from;
+  });
+  const [reportTimesheetTo, setReportTimesheetTo] = useState(() => {
+    const { to } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
+    return to;
+  });
+  const [reportTimesheetEmployee, setReportTimesheetEmployee] = useState("all");
+  const [reportTimesheetGroup, setReportTimesheetGroup] = useState("all");
   const [shiftRoleMode, setShiftRoleMode] = useState<"preset" | "custom">("preset");
   const [newEmployeeRoleMode, setNewEmployeeRoleMode] = useState<"preset" | "custom">("preset");
   const [employeePeriodFrom, setEmployeePeriodFrom] = useState(() => {
@@ -463,12 +516,6 @@ async function handleLogout() {
       setEmployeeFilter("All");
     }
   }, [employeeFilter, employeeNames]);
-
-  useEffect(() => {
-    if (!employeeNames.includes(timesheetEmployee) && employeeNames.length > 0) {
-      setTimesheetEmployee(employeeNames[0]);
-    }
-  }, [employeeNames, timesheetEmployee]);
 
   const filteredShifts = useMemo(() => {
     return shifts.filter((shift) => {
@@ -690,29 +737,50 @@ async function handleLogout() {
     return Array.from(years).sort((a, b) => b - a);
   }, [shifts, currentYear]);
 
-  const selectedTimesheetRows = useMemo(() => {
+  const timesheetReportFilteredShifts = useMemo(() => {
     return shifts
       .filter((shift) => {
-        const d = new Date(shift.date);
-        return (
-          shift.employee === timesheetEmployee &&
-          d.getMonth() + 1 === monthFilter &&
-          d.getFullYear() === yearFilter
-        );
+        if (reportTimesheetFrom && shift.date < reportTimesheetFrom) return false;
+        if (reportTimesheetTo && shift.date > reportTimesheetTo) return false;
+        if (reportTimesheetEmployee !== "all" && shift.employee !== reportTimesheetEmployee) {
+          return false;
+        }
+        if (reportTimesheetGroup === "ungrouped") {
+          const emp = employees.find((e) => e.name === shift.employee);
+          if (emp?.groupId) return false;
+        } else if (reportTimesheetGroup !== "all") {
+          const emp = employees.find((e) => e.name === shift.employee);
+          if (emp?.groupId !== reportTimesheetGroup) return false;
+        }
+        return true;
       })
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [shifts, timesheetEmployee, monthFilter, yearFilter]);
+      .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+  }, [
+    shifts,
+    reportTimesheetFrom,
+    reportTimesheetTo,
+    reportTimesheetEmployee,
+    reportTimesheetGroup,
+    employees,
+  ]);
 
-  const selectedTimesheetSummary = useMemo(() => {
-    return selectedTimesheetRows.reduce(
-      (acc, shift) => {
-        acc.planned += getPlannedHours(shift);
-        acc.worked += getWorkedHours(shift);
-        return acc;
-      },
-      { planned: 0, worked: 0 }
-    );
-  }, [selectedTimesheetRows]);
+  const payrollSummaryRows = useMemo<PayrollSummaryRow[]>(
+    () =>
+      employeeNames.map((employee) => ({
+        employee,
+        totalHours: monthlyHours[employee]?.worked ?? 0,
+        hourlyRate: employeeRateMap[employee] || 0,
+        totalCost: payrollCosts[employee]?.workedCost ?? 0,
+        active: employees.find((e) => e.name === employee)?.active ?? true,
+      })),
+    [employeeNames, monthlyHours, employeeRateMap, payrollCosts, employees]
+  );
+
+  const payrollSummaryTotals = useMemo(() => {
+    const totalHours = payrollSummaryRows.reduce((s, r) => s + r.totalHours, 0);
+    const totalPayrollCost = payrollSummaryRows.reduce((s, r) => s + r.totalCost, 0);
+    return { totalHours, totalPayrollCost };
+  }, [payrollSummaryRows]);
 
   function resetForm() {
     const firstEmployee = activeEmployees[0];
@@ -1251,6 +1319,33 @@ async function handleLogout() {
     }
   }
 
+  async function updateEmployeeGroup(name: string, groupId: string | null) {
+    if (!isAdmin) {
+      alert("Only workspace admins can change employee groups.");
+      return;
+    }
+
+    const emp = employees.find((e) => e.name === name);
+    if (!emp?.id || !activeCompanyId) return;
+
+    const { error } = await supabase
+      .from("employees")
+      .update({ employee_group_id: groupId })
+      .eq("id", emp.id)
+      .eq("company_id", activeCompanyId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setEmployees((current) =>
+      current.map((employee) =>
+        employee.name === name ? { ...employee, groupId } : employee
+      )
+    );
+  }
+
   async function updateEmployeeName(oldName: string, newName: string) {
     if (!isAdmin) {
       alert("Only workspace admins can rename employees.");
@@ -1327,8 +1422,8 @@ async function handleLogout() {
       setEmployeeFilter(trimmed);
     }
 
-    if (timesheetEmployee === oldName) {
-      setTimesheetEmployee(trimmed);
+    if (reportTimesheetEmployee === oldName) {
+      setReportTimesheetEmployee(trimmed);
     }
   }
 
@@ -1446,13 +1541,8 @@ async function handleLogout() {
       setEmployeeFilter("All");
     }
 
-    if (timesheetEmployee === name) {
-      const replacement = sortEmployeesForDisplay(
-        employees.filter((item) => item.name !== name)
-      )[0];
-      if (replacement) {
-        setTimesheetEmployee(replacement.name);
-      }
+    if (reportTimesheetEmployee === name) {
+      setReportTimesheetEmployee("all");
     }
   }
 
@@ -1630,6 +1720,8 @@ async function handleLogout() {
       defaultRole: data.default_role,
       unavailableDates: data.unavailable_dates || [],
       active: data.active,
+      groupId:
+        (data as { employee_group_id?: string | null }).employee_group_id ?? null,
     };
 
     setEmployees((current: any[]) => [...current, newEmployee]);
@@ -1640,10 +1732,6 @@ async function handleLogout() {
         employee: trimmedName,
         role: newEmployee.defaultRole,
       }));
-    }
-
-    if (employeeNames.length === 0) {
-      setTimesheetEmployee(trimmedName);
     }
 
     setNewEmployeeForm(defaultNewEmployeeForm);
@@ -1807,40 +1895,23 @@ async function handleLogout() {
       ["Month", monthNames[monthFilter]],
       ["Year", String(yearFilter)],
       [],
-      [
-        "Employee",
-        "Month",
-        "Year",
-        "Planned Hours",
-        "Worked Hours",
-        "Rate DKK",
-        "Planned Cost DKK",
-        "Worked Cost DKK",
-      ],
-      ...employeeNames.map((employee) => [
-        employee,
-        monthNames[monthFilter],
-        String(yearFilter),
-        monthlyHours[employee].planned.toFixed(1),
-        monthlyHours[employee].worked.toFixed(1),
-        String(employeeRateMap[employee] || 0),
-        payrollCosts[employee].plannedCost.toFixed(2),
-        payrollCosts[employee].workedCost.toFixed(2),
+      ["Employee", "Total hours", "Hourly rate (DKK)", "Total cost (DKK)"],
+      ...payrollSummaryRows.map((r) => [
+        r.employee,
+        r.totalHours.toFixed(2),
+        r.hourlyRate.toFixed(2),
+        r.totalCost.toFixed(2),
       ]),
       [],
       [
         "Totals",
+        payrollSummaryTotals.totalHours.toFixed(2),
         "",
-        "",
-        monthlyTotalPlanned.toFixed(1),
-        monthlyTotalWorked.toFixed(1),
-        "",
-        monthlyTotalPlannedCost.toFixed(2),
-        monthlyTotalWorkedCost.toFixed(2),
+        payrollSummaryTotals.totalPayrollCost.toFixed(2),
       ],
     ];
 
-    const csvContent = rows.map((row) => row.join(",")).join("\\n");
+    const csvContent = rows.map((row) => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
 
@@ -1849,7 +1920,8 @@ async function handleLogout() {
     link.setAttribute(
       "download",
       `${workspaceName.replace(/\s+/g, "-").toLowerCase()}-${monthNames[
-        monthFilter].toLowerCase()}-${yearFilter}-payroll.csv`
+        monthFilter
+      ].toLowerCase()}-${yearFilter}-payroll-summary.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -1860,7 +1932,7 @@ async function handleLogout() {
     const reportHtml = `
       <html>
         <head>
-          <title>Payroll Report</title>
+          <title>Payroll summary</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
             h1, p { margin: 0 0 10px 0; }
@@ -1876,46 +1948,32 @@ async function handleLogout() {
           <div class="header">
             <h1>${workspaceName}</h1>
             <p>CVR: ${workspaceCvr}</p>
-            <p>Payroll Report for ${monthNames[monthFilter]} ${yearFilter}</p>
+            <p>Payroll summary — ${monthNames[monthFilter]} ${yearFilter}</p>
           </div>
 
           <div class="summary">
-            <p><strong>Total Planned Hours:</strong> ${monthlyTotalPlanned.toFixed(
-              1
-            )} hrs</p>
-            <p><strong>Total Worked Hours:</strong> ${monthlyTotalWorked.toFixed(
-              1
-            )} hrs</p>
-            <p><strong>Planned Payroll Cost:</strong> ${formatDKK(
-              monthlyTotalPlannedCost
-            )}</p>
-            <p><strong>Worked Payroll Cost:</strong> ${formatDKK(
-              monthlyTotalWorkedCost
-            )}</p>
+            <p><strong>Total hours:</strong> ${payrollSummaryTotals.totalHours.toFixed(1)} hrs</p>
+            <p><strong>Total payroll cost:</strong> ${formatDKK(payrollSummaryTotals.totalPayrollCost)}</p>
           </div>
 
           <table>
             <thead>
               <tr>
                 <th>Employee</th>
-                <th>Planned Hours</th>
-                <th>Worked Hours</th>
-                <th>Rate (DKK/hr)</th>
-                <th>Planned Cost</th>
-                <th>Worked Cost</th>
+                <th>Total hours</th>
+                <th>Hourly rate (DKK)</th>
+                <th>Total cost</th>
               </tr>
             </thead>
             <tbody>
-              ${employeeNames
+              ${payrollSummaryRows
                 .map(
-                  (employee) => `
+                  (r) => `
                 <tr>
-                  <td>${employee}</td>
-                  <td>${monthlyHours[employee].planned.toFixed(1)}</td>
-                  <td>${monthlyHours[employee].worked.toFixed(1)}</td>
-                  <td>${employeeRateMap[employee] || 0}</td>
-                  <td>${payrollCosts[employee].plannedCost.toFixed(2)}</td>
-                  <td>${payrollCosts[employee].workedCost.toFixed(2)}</td>
+                  <td>${r.employee}</td>
+                  <td>${r.totalHours.toFixed(1)}</td>
+                  <td>${r.hourlyRate.toFixed(2)}</td>
+                  <td>${r.totalCost.toFixed(2)}</td>
                 </tr>
               `
                 )
@@ -1939,6 +1997,119 @@ async function handleLogout() {
     printWindow.document.close();
     printWindow.focus();
 
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  }
+
+  function downloadTimesheetsReportCsv() {
+    const headers = [
+      "Employee",
+      "Date",
+      "Start",
+      "End",
+      "Total hours",
+      "Hourly rate (DKK)",
+      "Total cost (DKK)",
+    ];
+    const body = timesheetReportFilteredShifts.map((shift) => {
+      const rate = employeeRateMap[shift.employee] || 0;
+      const hours = reportHoursForShift(shift);
+      const cost = hours * rate;
+      return [
+        shift.employee,
+        shift.date,
+        reportStartDisplay(shift),
+        reportEndDisplay(shift),
+        hours.toFixed(2),
+        rate.toFixed(2),
+        cost.toFixed(2),
+      ];
+    });
+    const rows = [
+      ["Company", workspaceName],
+      ["CVR", workspaceCvr],
+      ["From", reportTimesheetFrom],
+      ["To", reportTimesheetTo],
+      ["Employee filter", reportTimesheetEmployee],
+      ["Group filter", reportTimesheetGroup],
+      [],
+      headers,
+      ...body,
+    ];
+    const csvContent = rows.map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `${workspaceName.replace(/\s+/g, "-").toLowerCase()}-timesheets-${reportTimesheetFrom}-to-${reportTimesheetTo}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function downloadTimesheetsReportPdf() {
+    const rowsHtml =
+      timesheetReportFilteredShifts.length === 0
+        ? '<tr><td colspan="7">No shifts match these filters.</td></tr>'
+        : timesheetReportFilteredShifts
+            .map((shift) => {
+              const rate = employeeRateMap[shift.employee] || 0;
+              const hours = reportHoursForShift(shift);
+              const cost = hours * rate;
+              return `<tr>
+                <td>${shift.employee}</td>
+                <td>${shift.date}</td>
+                <td>${reportStartDisplay(shift)}</td>
+                <td>${reportEndDisplay(shift)}</td>
+                <td>${hours.toFixed(2)}</td>
+                <td>${rate.toFixed(2)}</td>
+                <td>${cost.toFixed(2)}</td>
+              </tr>`;
+            })
+            .join("");
+
+    const reportHtml = `
+      <html>
+        <head>
+          <title>Timesheets</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+            h1, p { margin: 0 0 10px 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 12px; }
+            th { background: #f3f4f6; }
+          </style>
+        </head>
+        <body>
+          <h1>${workspaceName}</h1>
+          <p>CVR: ${workspaceCvr}</p>
+          <p><strong>Period:</strong> ${reportTimesheetFrom} to ${reportTimesheetTo}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th><th>Date</th><th>Start</th><th>End</th>
+                <th>Total hours</th><th>Hourly rate</th><th>Total cost (DKK)</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
+    if (!printWindow) {
+      alert("Popup blocked. Please allow popups to export PDF.");
+      return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(reportHtml);
+    printWindow.document.close();
+    printWindow.focus();
     setTimeout(() => {
       printWindow.print();
     }, 500);
@@ -1999,7 +2170,7 @@ async function handleLogout() {
       ],
     ];
 
-    const csvContent = rows.map((row) => row.join(",")).join("\\n");
+    const csvContent = rows.map((row) => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
 
@@ -2090,183 +2261,6 @@ async function handleLogout() {
     }, 500);
   }
 
-  function downloadEmployeeTimesheetCsv() {
-    if (!timesheetEmployee) {
-      alert("Please select an employee.");
-      return;
-    }
-
-    const rows = [
-      ["Company", workspaceName],
-      ["CVR", workspaceCvr],
-      ["Employee", timesheetEmployee],
-      ["Month", monthNames[monthFilter]],
-      ["Year", String(yearFilter)],
-      [],
-      [
-        "Date",
-        "Day",
-        "Role",
-        "Planned Start",
-        "Planned End",
-        "Planned Hours",
-        "Actual In",
-        "Actual Out",
-        "Worked Hours",
-        "Notes",
-      ],
-      ...selectedTimesheetRows.map((shift) => [
-        shift.date,
-        shift.day,
-        shift.role,
-        shift.start,
-        shift.end,
-        getPlannedHours(shift).toFixed(1),
-        shift.actualStart || "",
-        shift.actualEnd || "",
-        getWorkedHours(shift).toFixed(1),
-        shift.notes.replace(/,/g, ";"),
-      ]),
-      [],
-      [
-        "Totals",
-        "",
-        "",
-        "",
-        "",
-        selectedTimesheetSummary.planned.toFixed(1),
-        "",
-        "",
-        selectedTimesheetSummary.worked.toFixed(1),
-        "",
-      ],
-    ];
-
-    const csvContent = rows.map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-
-    const safeEmployee = timesheetEmployee.replace(/\s+/g, "-").toLowerCase();
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      `${safeEmployee}-${monthNames[monthFilter].toLowerCase()}-${yearFilter}-timesheet.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  function downloadEmployeeTimesheetPdf() {
-    if (!timesheetEmployee) {
-      alert("Please select an employee.");
-      return;
-    }
-
-    const employeeRate = employeeRateMap[timesheetEmployee] || 0;
-    const workedCost = selectedTimesheetSummary.worked * employeeRate;
-
-    const reportHtml = `
-      <html>
-        <head>
-          <title>Employee Timesheet</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
-            h1, h2, p { margin: 0 0 10px 0; }
-            .header { margin-bottom: 24px; }
-            .summary { margin: 20px 0; padding: 16px; border: 1px solid #d1d5db; border-radius: 12px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-            th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 12px; }
-            th { background: #f3f4f6; }
-            .footer { margin-top: 24px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>${workspaceName}</h1>
-            <p>CVR: ${workspaceCvr}</p>
-            <p>Employee Timesheet</p>
-            <p><strong>Employee:</strong> ${timesheetEmployee}</p>
-            <p><strong>Period:</strong> ${monthNames[monthFilter]} ${yearFilter}</p>
-          </div>
-
-          <div class="summary">
-            <p><strong>Total Planned Hours:</strong> ${selectedTimesheetSummary.planned.toFixed(
-              1
-            )} hrs</p>
-            <p><strong>Total Worked Hours:</strong> ${selectedTimesheetSummary.worked.toFixed(
-              1
-            )} hrs</p>
-            <p><strong>Hourly Rate:</strong> ${employeeRate.toFixed(2)} DKK</p>
-            <p><strong>Worked Payroll Estimate:</strong> ${formatDKK(
-              workedCost
-            )}</p>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Day</th>
-                <th>Role</th>
-                <th>Planned</th>
-                <th>Planned Hours</th>
-                <th>Actual In</th>
-                <th>Actual Out</th>
-                <th>Worked Hours</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${
-                selectedTimesheetRows.length === 0
-                  ? `<tr><td colspan="9">No shifts found for this period.</td></tr>`
-                  : selectedTimesheetRows
-                      .map(
-                        (shift) => `
-                  <tr>
-                    <td>${shift.date}</td>
-                    <td>${shift.day}</td>
-                    <td>${shift.role}</td>
-                    <td>${shift.start} - ${shift.end}</td>
-                    <td>${getPlannedHours(shift).toFixed(1)}</td>
-                    <td>${shift.actualStart || "—"}</td>
-                    <td>${shift.actualEnd || "—"}</td>
-                    <td>${getWorkedHours(shift).toFixed(1)}</td>
-                    <td>${shift.notes || ""}</td>
-                  </tr>
-                `
-                      )
-                      .join("")
-              }
-            </tbody>
-          </table>
-
-          <div class="footer">
-            <p><strong>Prepared by:</strong> ${workspaceName}</p>
-            <p><strong>Signature:</strong> ________________________________</p>
-          </div>
-        </body>
-      </html>
-    `;
-
-    const printWindow = window.open("", "_blank", "width=1000,height=800");
-    if (!printWindow) {
-      alert("Popup blocked. Please allow popups to export PDF.");
-      return;
-    }
-
-    printWindow.document.open();
-    printWindow.document.write(reportHtml);
-    printWindow.document.close();
-    printWindow.focus();
-
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
-  }
-
   function openCreateShiftFromHeader() {
     setActiveTab("schedule");
     resetForm();
@@ -2281,8 +2275,8 @@ async function handleLogout() {
     router.push("/invites");
   }
 
-  function openPayrollFromHome() {
-    setActiveTab("payroll");
+  function openReportsPayrollFromHome() {
+    setActiveTab("reports-payroll");
   }
 
   function openHomeMenuTab(tab: AppTab) {
@@ -2422,8 +2416,8 @@ async function handleLogout() {
           : hasEmployees
           ? "in_progress"
           : "not_started",
-        actionLabel: "Review payroll",
-        onAction: openPayrollFromHome,
+        actionLabel: "Open reports",
+        onAction: openReportsPayrollFromHome,
       },
       {
         id: "invite",
@@ -2450,7 +2444,7 @@ async function handleLogout() {
       openAddEmployeeFromHeader,
       openCreateShiftFromHeader,
       openInviteTeamFromHome,
-      openPayrollFromHome,
+      openReportsPayrollFromHome,
     ]
   );
 
@@ -2711,7 +2705,7 @@ async function handleLogout() {
             onAddEmployee={openAddEmployeeFromHeader}
             onCreateShift={openCreateShiftFromHeader}
             onInviteTeam={openInviteTeamFromHome}
-            onReviewPayroll={openPayrollFromHome}
+            onReviewPayroll={openReportsPayrollFromHome}
             showPayrollCta={isAdmin}
           />
         )}
@@ -2832,61 +2826,70 @@ async function handleLogout() {
           />
         )}
             
-        {isAdmin && activeTab === "payroll" && (
-  <PayrollSection
-    monthFilter={monthFilter}
-    setMonthFilter={setMonthFilter}
-    yearFilter={yearFilter}
-    setYearFilter={setYearFilter}
-    yearsAvailable={yearsAvailable}
-    downloadPayrollCsv={downloadPayrollCsv}
-    downloadPayrollPdf={downloadPayrollPdf}
-    COMPANY_NAME={workspaceName}
-    COMPANY_CVR={workspaceCvr}
-    monthlyTotalPlanned={monthlyTotalPlanned}
-    monthlyTotalWorked={monthlyTotalWorked}
-    monthlyTotalPlannedCost={monthlyTotalPlannedCost}
-    monthlyTotalWorkedCost={monthlyTotalWorkedCost}
-    formatDKK={formatDKK}
-    employeeNames={employeeNames}
-    employees={employees}
-    monthlyHours={monthlyHours}
-    employeeRateMap={employeeRateMap}
-    payrollCosts={payrollCosts}
-    timesheetEmployee={timesheetEmployee}
-    setTimesheetEmployee={setTimesheetEmployee}
-    downloadEmployeeTimesheetCsv={downloadEmployeeTimesheetCsv}
-    downloadEmployeeTimesheetPdf={downloadEmployeeTimesheetPdf}
-    selectedTimesheetRows={selectedTimesheetRows}
-    selectedTimesheetSummary={selectedTimesheetSummary}
-    getPlannedHours={getPlannedHours}
-    getWorkedHours={getWorkedHours}
-    monthNames={monthNames}
-  />
-)}
+        {isAdmin && activeTab === "reports-timesheets" && (
+          <TimesheetsReport
+            workspaceName={workspaceName}
+            filteredShifts={timesheetReportFilteredShifts}
+            employees={employees}
+            employeeGroups={employeeGroups}
+            employeeRateMap={employeeRateMap}
+            dateFrom={reportTimesheetFrom}
+            dateTo={reportTimesheetTo}
+            onDateFromChange={setReportTimesheetFrom}
+            onDateToChange={setReportTimesheetTo}
+            employeeFilter={reportTimesheetEmployee}
+            onEmployeeFilterChange={setReportTimesheetEmployee}
+            groupFilter={reportTimesheetGroup}
+            onGroupFilterChange={setReportTimesheetGroup}
+            formatDKK={formatDKK}
+            onExportCsv={downloadTimesheetsReportCsv}
+            onExportPdf={downloadTimesheetsReportPdf}
+          />
+        )}
+        {isAdmin && activeTab === "reports-payroll" && (
+          <PayrollSummaryReport
+            workspaceName={workspaceName}
+            monthFilter={monthFilter}
+            setMonthFilter={setMonthFilter}
+            yearFilter={yearFilter}
+            setYearFilter={setYearFilter}
+            yearsAvailable={yearsAvailable}
+            monthNames={monthNames}
+            rows={payrollSummaryRows}
+            totalHours={payrollSummaryTotals.totalHours}
+            totalPayrollCost={payrollSummaryTotals.totalPayrollCost}
+            formatDKK={formatDKK}
+            onExportCsv={downloadPayrollCsv}
+            onExportPdf={downloadPayrollPdf}
+          />
+        )}
               
           
        {isAdmin && activeTab === "employees" && (
-  <EmployeesSection
-    sortedEmployeesData={sortedEmployeesData}
-    newEmployeeForm={newEmployeeForm}
-    setNewEmployeeForm={setNewEmployeeForm}
-    newEmployeeRoleMode={newEmployeeRoleMode}
-    setNewEmployeeRoleMode={setNewEmployeeRoleMode}
-    roleSuggestions={roleSuggestions}
-    CUSTOM_ROLE_OPTION={CUSTOM_ROLE_OPTION}
-    addEmployee={addEmployee}
-    setEmployeeActiveStatus={setEmployeeActiveStatus}
-    deleteEmployee={deleteEmployee}
-    updateEmployeeName={updateEmployeeName}
-    updateEmployeeRate={updateEmployeeRate}
-    updateEmployeeRole={updateEmployeeRole}
-    availabilityDrafts={availabilityDrafts}
-    updateAvailabilityDraft={updateAvailabilityDraft}
-    addUnavailableDate={addUnavailableDate}
-    removeUnavailableDate={removeUnavailableDate}
-  />
-)}
+          <EmployeesSection
+            sortedEmployeesData={sortedEmployeesData}
+            roleSuggestions={roleSuggestions}
+            addEmployee={addEmployee}
+            setEmployeeActiveStatus={setEmployeeActiveStatus}
+            deleteEmployee={deleteEmployee}
+            updateEmployeeName={updateEmployeeName}
+            updateEmployeeRate={updateEmployeeRate}
+            updateEmployeeRole={updateEmployeeRole}
+            updateEmployeeGroup={updateEmployeeGroup}
+            employeeGroups={employeeGroups}
+            availabilityDrafts={availabilityDrafts}
+            updateAvailabilityDraft={updateAvailabilityDraft}
+            addUnavailableDate={addUnavailableDate}
+            removeUnavailableDate={removeUnavailableDate}
+          />
+        )}
+        {isAdmin && activeTab === "employee-groups" && (
+          <EmployeeGroupsSection
+            companyId={activeCompanyId}
+            supabase={supabase}
+            onGroupsChanged={loadEmployeeGroups}
+          />
+        )}
                     
       </div>
     </main>

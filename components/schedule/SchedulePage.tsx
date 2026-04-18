@@ -275,11 +275,6 @@ export default function SchedulePage(props: any) {
     return sum + getWorkedHours(shift) * (employeeRateByName[shift.employee] || 0);
   }, 0);
 
-  const weeklyForecastRevenue = 0;
-  const weeklyActualRevenue = 0;
-  const payrollPercentage =
-    weeklyActualRevenue > 0 ? (weeklyWorkedPayroll / weeklyActualRevenue) * 100 : 0;
-
   const self = (employeeName || "").trim();
   const isOwnShift = (shift: any) => Boolean(self) && shift.employee === self;
 
@@ -442,7 +437,7 @@ export default function SchedulePage(props: any) {
       />
 
       <div className="w-full">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className={kpiCardClass}>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Planned hours</p>
             <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
@@ -456,27 +451,15 @@ export default function SchedulePage(props: any) {
             </p>
           </div>
           <div className={kpiCardClass}>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Revenue (forecast)</p>
-            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
-              £{weeklyForecastRevenue.toFixed(2)}
-            </p>
-          </div>
-          <div className={kpiCardClass}>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Revenue (actual)</p>
-            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
-              £{weeklyActualRevenue.toFixed(2)}
-            </p>
-          </div>
-          <div className={kpiCardClass}>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Payroll %</p>
-            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
-              {payrollPercentage.toFixed(1)}%
-            </p>
-          </div>
-          <div className={kpiCardClass}>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Worked hours</p>
             <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
               {weeklyWorkedHours.toFixed(1)}
+            </p>
+          </div>
+          <div className={kpiCardClass}>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Payroll (worked)</p>
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-emerald-800">
+              £{weeklyWorkedPayroll.toFixed(2)}
             </p>
           </div>
         </div>

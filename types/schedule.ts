@@ -21,6 +21,15 @@ export type EmployeeConfig = {
   defaultRole: string;
   unavailableDates: string[];
   active: boolean;
+  /** Optional link to `employee_groups` for filtering and wage defaults */
+  groupId?: string | null;
+};
+
+/** Workspace-scoped group (MVP: name + optional hourly wage). */
+export type EmployeeGroupRow = {
+  id: string;
+  name: string;
+  hourlyWage: number | null;
 };
 
 export type FormState = {
@@ -38,4 +47,12 @@ export type NewEmployeeForm = {
   defaultRole: string;
 };
 
-export type AppTab = "home" | "schedule" | "week" | "month" | "payroll" | "employees";
+export type AppTab =
+  | "home"
+  | "schedule"
+  | "week"
+  | "month"
+  | "reports-timesheets"
+  | "reports-payroll"
+  | "employees"
+  | "employee-groups";

@@ -175,6 +175,7 @@ export function normalizeEmployeesData(data: unknown): EmployeeConfig[] {
     defaultRole: e.defaultRole || "Kitchen",
     unavailableDates: e.unavailableDates || [],
     active: e.active ?? true,
+    groupId: e.groupId ?? null,
   }));
 }
 

@@ -26,17 +26,25 @@ export default function ScheduleBulkSelectionBar({
   return (
     <div
       ref={barRef}
+      role="region"
+      aria-label="Bulk shift actions"
       aria-hidden={!open}
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 relative"
     >
       <div
-        className={`w-full max-w-3xl transition-all duration-300 ease-out ${
-          open ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none translate-y-full opacity-0"
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-slate-900/12 via-slate-900/5 to-transparent transition-opacity duration-300 ${
+          open ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      <div
+        className={`relative w-full max-w-3xl will-change-[transform,opacity] transition-all duration-300 ease-out motion-reduce:transition-none ${
+          open ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none translate-y-[110%] opacity-0"
         }`}
       >
-        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_-12px_40px_rgba(15,23,42,0.14)] sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_-8px_32px_rgba(15,23,42,0.12),0_-1px_0_rgba(15,23,42,0.06)] backdrop-blur-sm ring-1 ring-slate-900/5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900">
+            <p className="text-sm font-semibold text-slate-900" aria-live="polite" aria-atomic="true">
               {count} shift{count === 1 ? "" : "s"} selected
             </p>
             <button
@@ -47,7 +55,11 @@ export default function ScheduleBulkSelectionBar({
               Deselect all
             </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <div
+            className="flex flex-wrap items-center gap-2 sm:justify-end"
+            role="toolbar"
+            aria-label="Actions for selected shifts"
+          >
             <button
               type="button"
               onClick={onEdit}
