@@ -8,8 +8,6 @@ import ScheduleSection from "../schedule/ScheduleSection";
 import ShiftFormModal from "../schedule/ShiftFormModal";
 import GuidedWorkspaceSetup from "../onboarding/GuidedWorkspaceSetup";
 import WorkspaceAppNav from "./WorkspaceAppNav";
-import WeekSection from "../schedule/WeekSection";
-import MonthSection from "../month/MonthSection";
 import TimesheetsReport from "../reports/TimesheetsReport";
 import PayrollOverview, { type PayrollOverviewRow } from "../payroll/PayrollOverview";
 import EmployeePayrollDetail from "../payroll/EmployeePayrollDetail";
@@ -467,8 +465,6 @@ export default function AppShell({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [employeeFilter, setEmployeeFilter] = useState("All");
   const [copyFromDate, setCopyFromDate] = useState(initialWeekDates[0].date);
-  const [monthFilter, setMonthFilter] = useState(new Date().getMonth() + 1);
-  const [yearFilter, setYearFilter] = useState(currentYear);
   const [availabilityDrafts, setAvailabilityDrafts] = useState<
     Record<string, string>
   >({});
@@ -574,6 +570,56 @@ export default function AppShell({
   }, [employees, shifts]);
 
   const weekDates = useMemo(() => getWeekDates(weekStart, weekPref), [weekStart, weekPref]);
+
+  const homeWeekDateSet = useMemo(() => new Set(weekDates.map((item) => item.date)), [weekDates]);
+
+  const adminHomeDashboard = useMemo(() => {
+    if (!isAdmin) return null;
+    const weekShifts = shifts.filter((s) => homeWeekDateSet.has(s.date));
+    const plannedHoursWeek = weekShifts.reduce((sum, s) => sum + getPlannedHours(s), 0);
+    let estimatedPayrollWeek = 0;
+    for (const s of weekShifts) {
+      const rate = employees.find((e) => e.name === s.employee)?.hourlyRate ?? 0;
+      estimatedPayrollWeek += getPlannedHours(s) * rate;
+    }
+    return {
+      employeesCount: activeEmployees.length,
+      shiftsThisWeek: weekShifts.length,
+      plannedHoursWeek,
+      estimatedPayrollWeek,
+      currencyLabel: currencyCode,
+    };
+  }, [isAdmin, shifts, homeWeekDateSet, employees, activeEmployees, currencyCode]);
+
+  const adminHomeUpcoming = useMemo(() => {
+    if (!isAdmin) return [];
+    return [...shifts]
+      .filter((s) => homeWeekDateSet.has(s.date))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
+      .slice(0, 8)
+      .map((s) => ({
+        id: s.id,
+        date: s.date,
+        start: s.start,
+        end: s.end,
+        employee: s.employee,
+        role: s.role,
+      }));
+  }, [isAdmin, shifts, homeWeekDateSet]);
+
+  const adminHomeAlerts = useMemo(() => {
+    if (!isAdmin) return [];
+    const list: string[] = [];
+    if (activeEmployees.length === 0) {
+      list.push("No employees yet — add your team to start scheduling.");
+    }
+    const weekCount = shifts.filter((s) => homeWeekDateSet.has(s.date)).length;
+    if (weekCount === 0) {
+      list.push("No shifts scheduled for this week.");
+    }
+    return list;
+  }, [isAdmin, activeEmployees.length, shifts, homeWeekDateSet]);
+
   const hasShiftsForGuided = shifts.length > 0;
 
   useEffect(() => {
@@ -769,19 +815,6 @@ export default function AppShell({
     [employeeFilter, employeeNames, employees]
   );
 
-  const onMonthPlannerSelectDay = useCallback(
-    (date: string) => {
-      const d = fromDateInputValue(date);
-      setMonthFilter(d.getMonth() + 1);
-      setYearFilter(d.getFullYear());
-      setSelectedDate(date);
-      setForm((current) => ({ ...current, date }));
-      setOpenMenuId(null);
-      setWeekStart(startOfWeekWithPreference(d, weekPref));
-    },
-    [setForm, setOpenMenuId, weekPref]
-  );
-
   const selectedDateTotals = useMemo(() => {
     const totals: Record<string, { planned: number; worked: number }> = {};
     for (const employee of employeeNames) {
@@ -810,111 +843,6 @@ export default function AppShell({
   const dayWorkedHours = useMemo(() => {
     return filteredShifts.reduce((sum, shift) => sum + getWorkedHours(shift), 0);
   }, [filteredShifts, getWorkedHours]);
-
-  const weeklyOverview = useMemo(() => {
-    const result: Record<string, Record<string, Shift[]>> = {};
-    const dateSet = new Set(weekDates.map((item) => item.date));
-    for (const name of employeeNames) {
-      const row: Record<string, Shift[]> = {};
-      for (const item of weekDates) {
-        row[item.date] = [];
-      }
-      result[name] = row;
-    }
-    for (const shift of shifts) {
-      if (!dateSet.has(shift.date)) continue;
-      const row = result[shift.employee];
-      if (!row) continue;
-      const cell = row[shift.date];
-      if (cell) cell.push(shift);
-    }
-    return result;
-  }, [shifts, weekDates, employeeNames]);
-
-  const weeklyTotals = useMemo(() => {
-    const totals: Record<string, { planned: number; worked: number }> = {};
-    for (const employee of employeeNames) {
-      totals[employee] = { planned: 0, worked: 0 };
-    }
-
-    const dateSet = new Set(weekDates.map((item) => item.date));
-    shifts.forEach((shift) => {
-      if (!dateSet.has(shift.date)) return;
-
-      if (!totals[shift.employee]) {
-        totals[shift.employee] = { planned: 0, worked: 0 };
-      }
-
-      totals[shift.employee].planned += getPlannedHours(shift);
-      totals[shift.employee].worked += getWorkedHours(shift);
-    });
-
-    return totals;
-  }, [shifts, weekDates, employeeNames, getPlannedHours, getWorkedHours]);
-
-  const monthlyHours = useMemo(() => {
-    const totals: Record<string, { planned: number; worked: number }> = {};
-    for (const employee of employeeNames) {
-      totals[employee] = { planned: 0, worked: 0 };
-    }
-
-    for (const shift of shifts) {
-      const shiftDate = new Date(shift.date);
-      const shiftMonth = shiftDate.getMonth() + 1;
-      const shiftYear = shiftDate.getFullYear();
-
-      if (shiftMonth === monthFilter && shiftYear === yearFilter) {
-        if (!totals[shift.employee]) {
-          totals[shift.employee] = { planned: 0, worked: 0 };
-        }
-        totals[shift.employee].planned += getPlannedHours(shift);
-        totals[shift.employee].worked += getWorkedHours(shift);
-      }
-    }
-
-    return totals;
-  }, [shifts, monthFilter, yearFilter, employeeNames]);
-
-  const payrollCosts = useMemo(() => {
-    const totals: Record<string, { plannedCost: number; workedCost: number }> =
-      {};
-    for (const employee of employeeNames) {
-      const rate = employeeRateMap[employee] || 0;
-      totals[employee] = {
-        plannedCost: monthlyHours[employee].planned * rate,
-        workedCost: monthlyHours[employee].worked * rate,
-      };
-    }
-    return totals;
-  }, [monthlyHours, employeeRateMap, employeeNames]);
-
-  const monthlyTotalPlanned = useMemo(() => {
-    return Object.values(monthlyHours).reduce(
-      (sum, item) => sum + item.planned,
-      0
-    );
-  }, [monthlyHours]);
-
-  const monthlyTotalWorked = useMemo(() => {
-    return Object.values(monthlyHours).reduce(
-      (sum, item) => sum + item.worked,
-      0
-    );
-  }, [monthlyHours]);
-
-  const monthlyTotalPlannedCost = useMemo(() => {
-    return Object.values(payrollCosts).reduce(
-      (sum, item) => sum + item.plannedCost,
-      0
-    );
-  }, [payrollCosts]);
-
-  const monthlyTotalWorkedCost = useMemo(() => {
-    return Object.values(payrollCosts).reduce(
-      (sum, item) => sum + item.workedCost,
-      0
-    );
-  }, [payrollCosts]);
 
   // Employee personal stats (for employee mode)
   const myStats = useMemo(() => {
@@ -2911,7 +2839,6 @@ export default function AppShell({
       <WorkspaceAppNav
         isAdmin={isAdmin}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
         navUserLabel={navUserLabel}
         isHomeMenuOpen={isHomeMenuOpen}
         isScheduleMenuOpen={isScheduleMenuOpen}
@@ -3024,42 +2951,43 @@ export default function AppShell({
               </div>
 
               <div className="grid w-full min-w-0 grid-cols-2 gap-3 sm:grid-cols-4 lg:w-auto lg:max-w-2xl lg:flex-1">
-                {isAdmin ? (
+                {isAdmin && adminHomeDashboard ? (
                   <>
-                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Total Shifts
-                      </p>
-                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
-                        {shifts.length}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Planned Hours
-                      </p>
-                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
-                        {dayHours.toFixed(1)}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Actual Hours
-                      </p>
-                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
-                        {dayWorkedHours.toFixed(1)}
-                      </p>
-                    </div>
                     <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                         Employees
                       </p>
                       <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
-                        {activeEmployees.length}
+                        {adminHomeDashboard.employeesCount}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Shifts this week
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {adminHomeDashboard.shiftsThisWeek}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Planned hours (week)
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {adminHomeDashboard.plannedHoursWeek.toFixed(1)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Est. payroll (week)
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                        {adminHomeDashboard.currencyLabel}{" "}
+                        {adminHomeDashboard.estimatedPayrollWeek.toFixed(0)}
                       </p>
                     </div>
                   </>
-                ) : (
+                ) : !isAdmin ? (
                   <>
                     <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
@@ -3094,75 +3022,8 @@ export default function AppShell({
                       </p>
                     </div>
                   </>
-                )}
+                ) : null}
               </div>
-            </div>
-          </div>
-        ) : null}
-
-        {!isAdmin && employeeName ? (
-          <div className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">My period summary</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Review your own shifts, approved hours, and download your timesheet.
-                </p>
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <label className="text-sm text-slate-600">
-                  <span className="mb-1 block font-medium">From</span>
-                  <input
-                    type="date"
-                    value={employeePeriodFrom}
-                    onChange={(e) => setEmployeePeriodFrom(e.target.value)}
-                    className="rounded-xl border border-slate-300 px-3 py-2"
-                  />
-                </label>
-                <label className="text-sm text-slate-600">
-                  <span className="mb-1 block font-medium">To</span>
-                  <input
-                    type="date"
-                    value={employeePeriodTo}
-                    onChange={(e) => setEmployeePeriodTo(e.target.value)}
-                    className="rounded-xl border border-slate-300 px-3 py-2"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
-              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                <p className="text-sm text-slate-500">Period Shifts</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">{employeePeriodStats.shifts}</p>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                <p className="text-sm text-slate-500">Period Planned</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">{employeePeriodStats.planned.toFixed(1)}</p>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                <p className="text-sm text-slate-500">Period Approved</p>
-                <p className="mt-1 text-2xl font-bold text-emerald-700">{employeePeriodStats.approved.toFixed(1)}</p>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                <p className="text-sm text-slate-500">Period Worked</p>
-                <p className="mt-1 text-2xl font-bold text-blue-700">{employeePeriodStats.worked.toFixed(1)}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                onClick={downloadMyPeriodTimesheetCsv}
-                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-                Download My Timesheet CSV
-              </button>
-              <button
-                onClick={downloadMyPeriodTimesheetPdf}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
-              >
-                Download My Timesheet PDF
-              </button>
             </div>
           </div>
         ) : null}
@@ -3176,9 +3037,13 @@ export default function AppShell({
             onCreateShift={openCreateShiftFromHeader}
             onInviteTeam={openInviteTeamFromHome}
             onReviewPayroll={openPayrollOverviewFromHome}
+            onOpenSchedule={() => setActiveTab("schedule")}
             showPayrollCta
             showRunSetupGuide={!hasShifts}
             onRunSetupGuide={openRunSetupGuideFromHome}
+            dashboard={adminHomeDashboard}
+            upcomingShifts={adminHomeUpcoming}
+            alerts={adminHomeAlerts}
           />
         ) : null}
 
@@ -3248,58 +3113,7 @@ export default function AppShell({
     onAddEmployeeCta={openAddEmployeeFromHeader}
   />
 )}
-            
-          
-{activeTab === "week" && (
-  <WeekSection
-    weekDates={weekDates}
-    employeeNames={employeeNames}
-    employees={employees}
-    weeklyOverview={weeklyOverview}
-    isEmployeeUnavailable={isEmployeeUnavailable}
-    getPlannedHours={getPlannedHours}
-    getWorkedHours={getWorkedHours}
-    roleStyles={roleStyles}
-    weeklyTotals={weeklyTotals}
-    employeeName={employeeName}
-  />
-)}
-            
-          
-        {activeTab === "month" && (
-          <MonthSection
-            monthFilter={monthFilter}
-            setMonthFilter={setMonthFilter}
-            yearFilter={yearFilter}
-            setYearFilter={setYearFilter}
-            yearsAvailable={yearsAvailable}
-            monthlyTotalPlanned={monthlyTotalPlanned}
-            monthlyTotalWorked={monthlyTotalWorked}
-            shifts={shifts}
-            getPlannedHours={getPlannedHours}
-            getWorkedHours={getWorkedHours}
-            employeeNames={employeeNames}
-            employees={employees}
-            monthlyHours={monthlyHours}
-            formatHours={formatHours}
-            employeeName={employeeName}
-            monthNames={monthNames}
-            selectedDate={selectedDate}
-            onMonthPlannerSelectDay={onMonthPlannerSelectDay}
-            isAdmin={isAdmin}
-            scheduleGridEmployees={scheduleGridEmployees}
-            employeeRoleMap={employeeRoleMap}
-            setSelectedDate={setSelectedDate}
-            setForm={setForm}
-            setOpenMenuId={setOpenMenuId}
-            setEditingId={setEditingId}
-            setShiftRoleMode={setShiftRoleMode}
-            setShowShiftForm={setShowShiftForm}
-            startEdit={startEdit}
-            onCreateShiftCta={openCreateShiftFromHeader}
-          />
-        )}
-            
+
         {isAdmin && activeTab === "reports-timesheets" && (
           <TimesheetsReport
             workspaceName={workspaceName}

@@ -3,8 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Shift } from "../../types/schedule";
-import { fromDateInputValue, startOfWeek, toDateInputValue } from "../../lib/utils";
-import EmployeeOpenShiftsPanel from "./EmployeeOpenShiftsPanel";
+import { fromDateInputValue, getPlannedHours, startOfWeek, toDateInputValue } from "../../lib/utils";
 import EmployeePortalShell from "./EmployeePortalShell";
 import EmployeeScheduleTable, { type ScheduleTableGroup } from "./EmployeeScheduleTable";
 import EmployeeScheduleTabs, { type EmployeeScheduleSectionTab } from "./EmployeeScheduleTabs";
@@ -51,7 +50,7 @@ export default function EmployeeHomeSchedulePage({
   employeeDisplayName,
   companyName,
 }: EmployeeHomeSchedulePageProps) {
-  const [sectionTab, setSectionTab] = useState<EmployeeScheduleSectionTab>("schedule");
+  const [sectionTab, setSectionTab] = useState<EmployeeScheduleSectionTab>("week");
   const [anchorMonth, setAnchorMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dayFilterOnly, setDayFilterOnly] = useState(false);
@@ -68,13 +67,17 @@ export default function EmployeeHomeSchedulePage({
   }, [initialShifts, rangeStartStr, rangeEndStr]);
 
   const tableShifts = useMemo(() => {
-    if (sectionTab === "open") return [];
     let list = rangeFiltered;
     if (dayFilterOnly && selectedDate) {
       list = list.filter((s) => s.date === selectedDate);
     }
     return list;
   }, [rangeFiltered, sectionTab, dayFilterOnly, selectedDate]);
+
+  const totalPlannedHours = useMemo(
+    () => tableShifts.reduce((sum, s) => sum + getPlannedHours(s), 0),
+    [tableShifts]
+  );
 
   const weekGroups: ScheduleTableGroup[] = useMemo(() => {
     const map = new Map<string, Shift[]>();
@@ -133,14 +136,21 @@ export default function EmployeeHomeSchedulePage({
 
         <EmployeeScheduleTabs active={sectionTab} onChange={setSectionTab} />
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+          <p className="text-sm text-slate-700">
+            <span className="font-semibold text-slate-900">Total planned hours</span>{" "}
+            <span className="tabular-nums text-slate-900">{totalPlannedHours.toFixed(1)}</span> h
+          </p>
           <button
             type="button"
             onClick={handlePrint}
             className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
           >
-            Print schedule
+            Print
           </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setShowRangeBanner((v) => !v)}
@@ -173,10 +183,7 @@ export default function EmployeeHomeSchedulePage({
           </div>
         ) : null}
 
-        {sectionTab === "open" ? (
-          <EmployeeOpenShiftsPanel />
-        ) : (
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
             <MiniMonthCalendarSidebar
               anchorMonth={anchorMonth}
               onAnchorMonthChange={setAnchorMonth}
@@ -209,7 +216,6 @@ export default function EmployeeHomeSchedulePage({
               ) : null}
             </div>
           </div>
-        )}
       </div>
     </EmployeePortalShell>
   );

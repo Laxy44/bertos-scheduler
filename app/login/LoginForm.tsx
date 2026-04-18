@@ -28,6 +28,9 @@ export function LoginForm({
             ? "Enter your email and we’ll send you a password reset link"
             : "Sign in to access Planyo"}
         </p>
+        <Link href="/" className="mt-2 inline-block text-sm font-medium text-indigo-700 hover:underline">
+          ← Planyo home
+        </Link>
 
         {confirmed ? (
           <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 ring-1 ring-emerald-200">

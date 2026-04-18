@@ -9,6 +9,23 @@ export type SetupCard = {
   onAction: () => void;
 };
 
+export type DashboardSummary = {
+  employeesCount: number;
+  shiftsThisWeek: number;
+  plannedHoursWeek: number;
+  estimatedPayrollWeek: number;
+  currencyLabel: string;
+};
+
+export type UpcomingShiftRow = {
+  id: string;
+  date: string;
+  start: string;
+  end: string;
+  employee: string;
+  role: string;
+};
+
 type HomeDashboardSectionProps = {
   displayName: string;
   workspaceName: string;
@@ -17,10 +34,14 @@ type HomeDashboardSectionProps = {
   onCreateShift: () => void;
   onInviteTeam: () => void;
   onReviewPayroll: () => void;
+  onOpenSchedule: () => void;
   showPayrollCta: boolean;
-  /** When true, show a control to re-launch the first-time guided setup (admins only). */
   showRunSetupGuide?: boolean;
   onRunSetupGuide?: () => void;
+  /** Admin-only workspace snapshot */
+  dashboard?: DashboardSummary | null;
+  upcomingShifts?: UpcomingShiftRow[];
+  alerts?: string[];
 };
 
 function statusPill(status: SetupCard["status"]) {
@@ -47,9 +68,13 @@ export default function HomeDashboardSection({
   onCreateShift,
   onInviteTeam,
   onReviewPayroll,
+  onOpenSchedule,
   showPayrollCta,
   showRunSetupGuide = false,
   onRunSetupGuide,
+  dashboard,
+  upcomingShifts = [],
+  alerts = [],
 }: HomeDashboardSectionProps) {
   const completedCount = setupCards.filter((card) => card.status === "completed").length;
   const progressPercent = Math.round((completedCount / setupCards.length) * 100);
@@ -57,12 +82,10 @@ export default function HomeDashboardSection({
   return (
     <section className="space-y-6">
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-          Planyo Setup Hub
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Dashboard</p>
         <h2 className="mt-2 text-lg font-semibold text-slate-900">Hi, {displayName}</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Here&apos;s your quick setup guide to get <span className="font-medium text-slate-800">{workspaceName}</span> ready.
+          <span className="font-medium text-slate-800">{workspaceName}</span> — overview and next steps.
         </p>
 
         <div className="mt-5">
@@ -78,6 +101,61 @@ export default function HomeDashboardSection({
           </div>
         </div>
       </div>
+
+      {dashboard ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Employees</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{dashboard.employeesCount}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Shifts this week</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{dashboard.shiftsThisWeek}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Planned hours</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
+              {dashboard.plannedHoursWeek.toFixed(1)}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Est. payroll</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
+              {dashboard.currencyLabel} {dashboard.estimatedPayrollWeek.toFixed(0)}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {alerts.length > 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm ring-1 ring-amber-100">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">Alerts</p>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-950">
+            {alerts.map((a) => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {upcomingShifts.length > 0 ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="text-base font-semibold text-slate-900">Upcoming shifts</h3>
+          <p className="mt-1 text-sm text-slate-500">Next in your calendar week.</p>
+          <ul className="mt-4 divide-y divide-slate-100">
+            {upcomingShifts.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 text-sm">
+                <span className="font-medium text-slate-900">
+                  {s.date} · {s.start}–{s.end}
+                </span>
+                <span className="text-slate-600">
+                  {s.employee} · {s.role}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {setupCards.map((card) => (
@@ -104,7 +182,7 @@ export default function HomeDashboardSection({
 
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="text-base font-semibold text-slate-900">Quick actions</h3>
-        <p className="mt-1 text-sm text-slate-600">Jump to the most common setup steps.</p>
+        <p className="mt-1 text-sm text-slate-600">Common tasks for running the week.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
@@ -118,7 +196,14 @@ export default function HomeDashboardSection({
             onClick={onCreateShift}
             className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
           >
-            Create first shift
+            Create shift
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSchedule}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Open schedule
           </button>
           <button
             type="button"
@@ -133,7 +218,7 @@ export default function HomeDashboardSection({
               onClick={onReviewPayroll}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
-              Review payroll
+              Payroll overview
             </button>
           ) : null}
           {showRunSetupGuide && onRunSetupGuide ? (
@@ -146,13 +231,6 @@ export default function HomeDashboardSection({
             </button>
           ) : null}
         </div>
-      </div>
-
-      <div className="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-900 to-slate-800 p-5 text-white shadow-sm">
-        <h3 className="text-base font-semibold">Get started faster with Planyo</h3>
-        <p className="mt-1 text-sm text-slate-300">
-          Keep your team schedule, attendance, and payroll visibility in one place while you scale.
-        </p>
       </div>
     </section>
   );

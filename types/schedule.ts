@@ -50,8 +50,6 @@ export type NewEmployeeForm = {
 export type AppTab =
   | "home"
   | "schedule"
-  | "week"
-  | "month"
   | "reports-timesheets"
   | "payroll-overview"
   | "payroll-employee"

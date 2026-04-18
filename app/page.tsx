@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import AppShell from "../components/layout/AppShell";
+import LandingPage from "@/components/marketing/LandingPage";
 import { getCachedWorkspaceForUser } from "@/lib/cached-workspace-load";
 import { getLinkedProfileEmployee } from "@/lib/profile-employee";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
@@ -32,7 +33,7 @@ export default async function Page({ searchParams }: PageProps) {
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    redirect("/login");
+    return <LandingPage />;
   }
 
   const [profileQuery, workspace] = await Promise.all([

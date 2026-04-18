@@ -1,6 +1,6 @@
 "use client";
 
-export type EmployeeScheduleSectionTab = "schedule" | "week" | "month" | "open";
+export type EmployeeScheduleSectionTab = "week" | "schedule" | "month";
 
 type EmployeeScheduleTabsProps = {
   active: EmployeeScheduleSectionTab;
@@ -8,10 +8,9 @@ type EmployeeScheduleTabsProps = {
 };
 
 const tabs: { id: EmployeeScheduleSectionTab; label: string }[] = [
-  { id: "schedule", label: "Your schedule" },
-  { id: "week", label: "Per week" },
-  { id: "month", label: "Per month" },
-  { id: "open", label: "Open shifts" },
+  { id: "week", label: "Weekly view" },
+  { id: "schedule", label: "All dates" },
+  { id: "month", label: "By month" },
 ];
 
 export default function EmployeeScheduleTabs({ active, onChange }: EmployeeScheduleTabsProps) {

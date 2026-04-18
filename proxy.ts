@@ -10,6 +10,7 @@ export async function proxy(request: NextRequest) {
   const loginMode = searchParams.get("mode");
   const isRecoveryMode = pathname === "/login" && loginMode === "recovery";
   const isPublicPath =
+    pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/auth/error") ||

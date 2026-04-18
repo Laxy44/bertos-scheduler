@@ -7,7 +7,6 @@ import { AnchoredMenu } from "../ui/AnchoredMenu";
 export type WorkspaceAppNavProps = {
   isAdmin: boolean;
   activeTab: AppTab;
-  setActiveTab: (tab: AppTab) => void;
   navUserLabel: string;
   isHomeMenuOpen: boolean;
   isScheduleMenuOpen: boolean;
@@ -51,7 +50,6 @@ const menuItem =
 export default function WorkspaceAppNav({
   isAdmin,
   activeTab,
-  setActiveTab,
   navUserLabel,
   isHomeMenuOpen,
   isScheduleMenuOpen,
@@ -116,13 +114,6 @@ export default function WorkspaceAppNav({
             >
               Profile
             </button>
-            <button
-              type="button"
-              className={menuItem}
-              onClick={() => openUserMenuRoute("/account")}
-            >
-              Account
-            </button>
             <button type="button" className={menuItem} onClick={onLogout}>
               Log out
             </button>
@@ -151,7 +142,7 @@ export default function WorkspaceAppNav({
             contentClassName="w-56"
           >
             <button type="button" className={menuItem} onClick={() => openHomeMenuTab("home")}>
-              Home
+              Dashboard
             </button>
             <button type="button" className={menuItem} onClick={() => openHomeMenuRoute("/your-schedule")}>
               Your schedule
@@ -162,20 +153,6 @@ export default function WorkspaceAppNav({
               onClick={() => openHomeMenuRoute("/your-availability")}
             >
               Your availability
-            </button>
-            <button
-              type="button"
-              className={menuItem}
-              onClick={() => openHomeMenuRoute("/your-leave-overview")}
-            >
-              Your leave overview
-            </button>
-            <button
-              type="button"
-              className={menuItem}
-              onClick={() => openHomeMenuRoute("/payslips")}
-            >
-              Payslips
             </button>
           </AnchoredMenu>
         </div>
@@ -218,38 +195,26 @@ export default function WorkspaceAppNav({
                   className={menuItem}
                   onClick={() => openScheduleMenuRoute("/punch-clock")}
                 >
-                  Punch Clock
-                </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/your-availability")}
-                >
-                  Availability
-                </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/leave-requests")}
-                >
-                  Leave requests
-                </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/contracted-hours")}
-                >
-                  Contracted hours
+                  Punch clock
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                className={menuItem}
-                onClick={() => openScheduleMenuRoute("/punch-clock")}
-              >
-                Punch clock
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={menuItem}
+                  onClick={() => openScheduleMenuRoute("/your-schedule")}
+                >
+                  Your schedule
+                </button>
+                <button
+                  type="button"
+                  className={menuItem}
+                  onClick={() => openScheduleMenuRoute("/punch-clock")}
+                >
+                  Punch clock
+                </button>
+              </>
             )}
           </AnchoredMenu>
         </div>
@@ -398,31 +363,39 @@ export default function WorkspaceAppNav({
                 className={menuItem}
                 onClick={() => openSettingsMenuRoute("/settings/general")}
               >
-                Settings
+                General
+              </button>
+              <button
+                type="button"
+                className={menuItem}
+                onClick={() => openSettingsMenuRoute("/settings/schedule")}
+              >
+                Schedule
+              </button>
+              <button
+                type="button"
+                className={menuItem}
+                onClick={() => openSettingsMenuRoute("/settings/employees")}
+              >
+                Employees
+              </button>
+              <button
+                type="button"
+                className={menuItem}
+                onClick={() => openSettingsMenuRoute("/settings/payroll")}
+              >
+                Payroll
+              </button>
+              <button
+                type="button"
+                className={menuItem}
+                onClick={() => openSettingsMenuRoute("/settings/security")}
+              >
+                Security
               </button>
             </AnchoredMenu>
           </div>
         ) : null}
-
-        <div className="ml-auto flex flex-wrap items-center gap-1 border-l border-slate-800/80 pl-2">
-          {(
-            [
-              { key: "week" as const, label: "Week view" },
-              { key: "month" as const, label: "Month view" },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`${navBtn} ${
-                activeTab === tab.key ? navBtnActive : navBtnIdle
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
       </nav>
     </header>
   );

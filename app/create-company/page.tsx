@@ -63,12 +63,14 @@ export default async function CreateCompanyPage({
           existingUserEmail={userEmail}
         />
 
-        <Link
-          href="/login"
-          className="mt-4 block text-center text-sm font-medium text-slate-600 hover:text-slate-900"
-        >
-          Back to login
-        </Link>
+        <div className="mt-4 flex flex-col gap-2 text-center text-sm font-medium">
+          <Link href="/" className="text-slate-600 hover:text-slate-900">
+            Planyo home
+          </Link>
+          <Link href="/login" className="text-slate-600 hover:text-slate-900">
+            Back to login
+          </Link>
+        </div>
       </div>
     </main>
   );
