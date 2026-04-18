@@ -172,16 +172,6 @@ export default function WorkspaceAppNav({
             >
               Payslips
             </button>
-            <button type="button" className={menuItem} onClick={() => openHomeMenuRoute("/news")}>
-              News
-            </button>
-            <button
-              type="button"
-              className={menuItem}
-              onClick={() => openHomeMenuRoute("/events")}
-            >
-              Events
-            </button>
           </AnchoredMenu>
         </div>
 
@@ -228,7 +218,7 @@ export default function WorkspaceAppNav({
                 <button
                   type="button"
                   className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/availability")}
+                  onClick={() => openScheduleMenuRoute("/your-availability")}
                 >
                   Availability
                 </button>
@@ -245,13 +235,6 @@ export default function WorkspaceAppNav({
                   onClick={() => openScheduleMenuRoute("/contracted-hours")}
                 >
                   Contracted hours
-                </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/leave-accounts")}
-                >
-                  Leave accounts
                 </button>
               </>
             ) : (

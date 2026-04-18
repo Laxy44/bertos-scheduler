@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addCalendarMonthsFirst,
   formatScheduleRangeLabel,
@@ -11,6 +11,7 @@ import {
 } from "../../lib/schedule-view-utils";
 import { buildPlannerShiftHandlers } from "../../lib/schedule-planner-handlers";
 import { addDays, fromDateInputValue, getMonthCalendarDays, getWeekDates, startOfWeek, toDateInputValue } from "../../lib/utils";
+import ScheduleBulkSelectionBar from "./ScheduleBulkSelectionBar";
 import ScheduleControls from "./ScheduleControls";
 import PlannerSubTabsRow from "./PlannerSubTabsRow";
 import ScheduleViewRouter from "./ScheduleViewRouter";
@@ -66,6 +67,9 @@ export default function SchedulePage(props: any) {
   const safeSetWeekStart = setWeekStart ?? (() => {});
 
   const [scheduleView, setScheduleView] = useState<ScheduleViewKind>("week");
+  const [selectedShiftIds, setSelectedShiftIds] = useState<string[]>([]);
+  const shiftListSurfaceRef = useRef<HTMLDivElement>(null);
+  const bulkBarRef = useRef<HTMLDivElement>(null);
   const [navigatorAnchor, setNavigatorAnchor] = useState<Date>(() => {
     const ws = props.weekStart instanceof Date ? props.weekStart : new Date(props.weekStart);
     return startOfWeek(ws);
@@ -295,6 +299,89 @@ export default function SchedulePage(props: any) {
     ? "flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200/90 bg-slate-50 px-4 py-3 shadow-sm"
     : "flex min-h-[92px] flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm";
 
+  const selectedCount = selectedShiftIds.length;
+
+  const toggleShiftSelected = useCallback(
+    (id: string) => {
+      setSelectedShiftIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+      setOpenMenuId(null);
+    },
+    [setOpenMenuId]
+  );
+
+  const clearShiftSelection = useCallback(() => {
+    setSelectedShiftIds([]);
+    setOpenMenuId(null);
+  }, [setOpenMenuId]);
+
+  useEffect(() => {
+    setSelectedShiftIds([]);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (selectedCount === 0) return;
+    function onMouseDown(e: MouseEvent) {
+      const node = e.target as Node;
+      if (shiftListSurfaceRef.current?.contains(node)) return;
+      if (bulkBarRef.current?.contains(node)) return;
+      setSelectedShiftIds([]);
+      setOpenMenuId(null);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [selectedCount, setOpenMenuId]);
+
+  useEffect(() => {
+    if (selectedCount === 0) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSelectedShiftIds([]);
+        setOpenMenuId(null);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedCount, setOpenMenuId]);
+
+  const handleBulkEdit = useCallback(() => {
+    if (selectedShiftIds.length !== 1) return;
+    const id = selectedShiftIds[0];
+    const shift = shifts.find((s: any) => s.id === id);
+    if (!shift) return;
+    setSelectedShiftIds([]);
+    setOpenMenuId(null);
+    startEdit(shift);
+  }, [selectedShiftIds, shifts, startEdit, setOpenMenuId]);
+
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedShiftIds.length === 0) return;
+    if (!confirm(`Delete ${selectedShiftIds.length} shifts? This cannot be undone.`)) return;
+    const ids = [...selectedShiftIds];
+    setSelectedShiftIds([]);
+    setOpenMenuId(null);
+    for (const id of ids) {
+      await deleteShift(id);
+    }
+  }, [selectedShiftIds, deleteShift, setOpenMenuId]);
+
+  const handleBulkApprove = useCallback(async () => {
+    if (selectedShiftIds.length === 0) return;
+    const ids = [...selectedShiftIds];
+    try {
+      for (const id of ids) {
+        const shift = shifts.find((s: any) => s.id === id);
+        if (shift && !shift.approved) {
+          await setShiftApproval(id, true);
+        }
+      }
+      setSelectedShiftIds([]);
+      setOpenMenuId(null);
+    } catch (e: any) {
+      alert(e?.message || "Could not approve one or more shifts.");
+    }
+  }, [selectedShiftIds, shifts, setShiftApproval, setOpenMenuId]);
+
   return (
     <section className="w-full space-y-4 sm:space-y-5">
       {isReadOnly ? (
@@ -396,9 +483,10 @@ export default function SchedulePage(props: any) {
       </div>
 
       <div
+        ref={shiftListSurfaceRef}
         className={`rounded-lg border p-5 shadow-sm sm:p-6 ${
           isReadOnly ? "border-slate-200/90 bg-slate-50/60" : "border-slate-200 bg-white"
-        }`}
+        } ${!isReadOnly && selectedCount > 0 ? "pb-28 sm:pb-24" : ""}`}
       >
         <div className="mb-4 flex flex-col gap-1 border-b border-slate-100 pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -485,10 +573,23 @@ export default function SchedulePage(props: any) {
                 return (
                   <div
                     key={shift.id}
-                    className={`rounded-2xl border p-3 ${
+                    className={`flex gap-3 rounded-2xl border p-3 ${
                       isApproved ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50"
                     }`}
                   >
+                    <div
+                      className="flex shrink-0 items-start pt-0.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedShiftIds.includes(shift.id)}
+                        onChange={() => toggleShiftSelected(shift.id)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        aria-label={`Select shift for ${shift.employee}`}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -640,12 +741,25 @@ export default function SchedulePage(props: any) {
                         </button>
                       </div>
                     ) : null}
+                    </div>
                   </div>
                 );
               })}
           </div>
         )}
       </div>
+
+      {isAdmin ? (
+        <ScheduleBulkSelectionBar
+          barRef={bulkBarRef}
+          count={selectedCount}
+          onDeselectAll={clearShiftSelection}
+          onEdit={handleBulkEdit}
+          onDelete={handleBulkDelete}
+          onApprove={handleBulkApprove}
+          editDisabled={selectedCount !== 1}
+        />
+      ) : null}
     </section>
   );
 }
