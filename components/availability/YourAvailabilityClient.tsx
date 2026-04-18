@@ -78,7 +78,10 @@ export default function YourAvailabilityClient({
   const [saveError, setSaveError] = useState<string | null>(null);
   const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowsRef = useRef(rowsByDate);
-  rowsRef.current = rowsByDate;
+
+  useEffect(() => {
+    rowsRef.current = rowsByDate;
+  }, [rowsByDate]);
 
   const days = useMemo(() => listDaysInMonth(year, month), [year, month]);
   const rangeLabel = useMemo(() => {
@@ -137,7 +140,9 @@ export default function YourAvailabilityClient({
   }, [supabase, userId, companyId, year, month, employeeName]);
 
   useEffect(() => {
-    void loadMonth();
+    queueMicrotask(() => {
+      void loadMonth();
+    });
   }, [loadMonth]);
 
   const persistDay = useCallback(

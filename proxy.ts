@@ -107,7 +107,12 @@ export async function proxy(request: NextRequest) {
 
     const activeMemberships = memberships.error ? [] : memberships.data || [];
     // Do not block password reset or invite completion when the user has multiple workspaces.
-    if (activeMemberships.length > 1 && !isAuthCompletionPath && pathname !== "/") {
+    if (
+      activeMemberships.length > 1 &&
+      !isAuthCompletionPath &&
+      pathname !== "/" &&
+      pathname !== "/workspace-conflict"
+    ) {
       const conflictUrl = request.nextUrl.clone();
       conflictUrl.pathname = "/workspace-conflict";
       conflictUrl.search = "";

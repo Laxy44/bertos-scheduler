@@ -190,13 +190,6 @@ export default function WorkspaceAppNav({
                 >
                   Pending requests
                 </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/app/punch-clock")}
-                >
-                  Punch clock
-                </button>
               </>
             ) : (
               <>
@@ -206,13 +199,6 @@ export default function WorkspaceAppNav({
                   onClick={() => openScheduleMenuRoute("/app/your-schedule")}
                 >
                   Your schedule
-                </button>
-                <button
-                  type="button"
-                  className={menuItem}
-                  onClick={() => openScheduleMenuRoute("/app/punch-clock")}
-                >
-                  Punch clock
                 </button>
               </>
             )}

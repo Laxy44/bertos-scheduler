@@ -170,7 +170,6 @@ export async function updateBreakRulesAction(input: {
 }): Promise<ActionResult> {
   const { workspaceSettings } = await requireSettingsAdmin();
   const schedule = workspaceSettings.schedule || {};
-  const br = schedule.breakRules || {};
   const parseOpt = (v: string) => {
     const t = String(v || "").trim();
     if (t === "") return undefined;
@@ -231,13 +230,19 @@ export async function getWorkspaceMembers(): Promise<MemberRow[]> {
     return [];
   }
 
-  return (data || []).map((row: any) => {
+  type MemberQueryRow = {
+    user_id: string;
+    role: string | null;
+    profiles: { name: string | null } | { name: string | null }[] | null;
+  };
+
+  return ((data as MemberQueryRow[] | null) ?? []).map((row) => {
     const prof = row.profiles;
     const name = Array.isArray(prof) ? prof[0]?.name : prof?.name;
     return {
-      userId: row.user_id as string,
-      role: (row.role as string) || "employee",
-      displayName: (name as string | null) ?? null,
+      userId: row.user_id,
+      role: row.role || "employee",
+      displayName: name ?? null,
     };
   });
 }

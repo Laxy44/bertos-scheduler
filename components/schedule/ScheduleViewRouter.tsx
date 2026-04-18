@@ -32,7 +32,10 @@ type PlannerProps = {
 };
 
 function toScheduleGridProps(planner: PlannerProps): ComponentProps<typeof ScheduleGrid> {
-  const { isAdmin: _a, employeeRateByName: _e, onEmptyMonthDayQuickAdd: _o, ...rest } = planner;
+  const { isAdmin, employeeRateByName, onEmptyMonthDayQuickAdd, ...rest } = planner;
+  void isAdmin;
+  void employeeRateByName;
+  void onEmptyMonthDayQuickAdd;
   return rest;
 }
 

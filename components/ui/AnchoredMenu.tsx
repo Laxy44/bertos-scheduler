@@ -65,7 +65,6 @@ export function AnchoredMenu({
 
   useLayoutEffect(() => {
     if (!open) {
-      setCoords(null);
       return;
     }
     updatePosition();

@@ -72,7 +72,7 @@ export default function EmployeeHomeSchedulePage({
       list = list.filter((s) => s.date === selectedDate);
     }
     return list;
-  }, [rangeFiltered, sectionTab, dayFilterOnly, selectedDate]);
+  }, [rangeFiltered, dayFilterOnly, selectedDate]);
 
   const totalPlannedHours = useMemo(
     () => tableShifts.reduce((sum, s) => sum + getPlannedHours(s), 0),

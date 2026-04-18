@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 
 type ActionState = {
   error: string | null;
@@ -29,12 +29,6 @@ export default function WorkspaceSignupForm({
   const [localError, setLocalError] = useState<string | null>(initialMessage || null);
 
   const [state, formAction, pending] = useActionState(action, INITIAL);
-
-  useEffect(() => {
-    if (isLoggedInWithoutMembership && existingUserEmail) {
-      setEmail(existingUserEmail);
-    }
-  }, [isLoggedInWithoutMembership, existingUserEmail]);
 
   function validate(): boolean {
     if (!firstName.trim() || !lastName.trim()) {

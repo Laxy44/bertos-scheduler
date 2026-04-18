@@ -29,7 +29,6 @@ export default async function PendingRequestsPage() {
     redirect("/create-company");
   }
 
-  const activeCompanyId = workspace.membership.company_id;
   const workspaceRole = (workspace.membership.role || "").trim();
   if (!isCompanyAdminRole(workspaceRole)) {
     redirect("/app/your-schedule");
@@ -65,7 +64,7 @@ export default async function PendingRequestsPage() {
           <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">Swap requests</h2>
           <div className="mt-6 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-4 py-10 text-center">
             <p className="text-sm font-medium text-slate-700">No swap requests</p>
-            <p className="mt-1 text-xs text-slate-500">Optional — swap flows can plug in here later.</p>
+            <p className="mt-1 text-xs text-slate-500">Nothing waiting on you right now.</p>
           </div>
         </section>
       </div>

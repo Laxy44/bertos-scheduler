@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export type ShiftLike = {
   id: string;
   employee: string;

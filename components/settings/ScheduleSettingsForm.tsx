@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   addShiftTypeAction,
@@ -21,6 +22,7 @@ export default function ScheduleSettingsForm({
   initialDefaultBreakMinutes,
   initialMinGapMinutes,
 }: Props) {
+  const router = useRouter();
   const [shiftTypes, setShiftTypes] = useState<ShiftTypeRow[]>(initialShiftTypes);
   const [newName, setNewName] = useState("");
   const [breakDef, setBreakDef] = useState(
@@ -33,7 +35,7 @@ export default function ScheduleSettingsForm({
   const [pending, startTransition] = useTransition();
 
   function refreshFromServer() {
-    window.location.reload();
+    router.refresh();
   }
 
   function onAdd(e: React.FormEvent) {

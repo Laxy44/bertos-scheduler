@@ -401,7 +401,6 @@ export default function EmployeesSection({
     hireDate: "",
     inviteToPlanyo: false,
     inviteAppRole: "employee" as "employee" | "admin",
-    sendWelcome: false,
   });
 
   const groupNameById = useMemo(() => {
@@ -529,7 +528,6 @@ export default function EmployeesSection({
         hireDate: "",
         inviteToPlanyo: current.inviteToPlanyo,
         inviteAppRole: current.inviteAppRole,
-        sendWelcome: current.sendWelcome,
       }));
       setIsModalOpen(false);
     } catch (error) {
@@ -789,20 +787,6 @@ export default function EmployeesSection({
                     </select>
                   </div>
                 ) : null}
-                <label className="inline-flex items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={modalForm.sendWelcome}
-                    onChange={(e) =>
-                      setModalForm((current) => ({
-                        ...current,
-                        sendWelcome: e.target.checked,
-                      }))
-                    }
-                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
-                  />
-                  <span>Send welcome message (placeholder only)</span>
-                </label>
               </div>
 
               <div className="mt-2 flex items-center justify-end gap-3">

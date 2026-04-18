@@ -61,7 +61,7 @@ function ResetPasswordInner() {
       return;
     }
 
-    window.location.assign(
+    window.location.replace(
       `/login?message=${encodeURIComponent("Password updated. Sign in with your new password.")}`
     );
   }
@@ -152,7 +152,7 @@ function ResetPasswordInner() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-500"
+            className="w-full rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
           >
             {isSubmitting ? "Saving..." : "Save password"}
           </button>

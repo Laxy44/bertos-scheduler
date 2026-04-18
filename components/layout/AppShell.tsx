@@ -45,7 +45,6 @@ import {
 import { isCompanyAdminRole } from "../../lib/workspace-role";
 import {
   addDays,
-  formatHours,
   formatMoney,
   fromDateInputValue,
   getCurrentTimeString,
@@ -132,7 +131,6 @@ export default function AppShell({
   companyDefaultHourlyWage,
   launchGuidedSetup = false,
 }: AppShellProps) {
-  const normalizedRole = (role || "employee").toLowerCase();
   const isAdmin = isCompanyAdminRole(role);
 
   /** Central guard for admin-only mutations and exports (logic-level, not UI-only). */
@@ -150,68 +148,6 @@ export default function AppShell({
   const formatCurrency = useCallback((n: number) => formatMoney(n, currencyCode), [currencyCode]);
   const supabase = createClient();
   const router = useRouter();
-
-  const loadEmployeeGroups = useCallback(async () => {
-    if (!activeCompanyId || !isAdmin) {
-      setEmployeeGroups([]);
-      return;
-    }
-    const { data, error } = await supabase
-      .from("employee_groups")
-      .select("id, name, hourly_wage")
-      .eq("company_id", activeCompanyId)
-      .order("name", { ascending: true });
-
-    if (error) {
-      console.log("Error fetching employee groups:", error);
-      return;
-    }
-
-    setEmployeeGroups(
-      (data || []).map((row: { id: string; name: string; hourly_wage: number | null }) => ({
-        id: row.id,
-        name: row.name,
-        hourlyWage: row.hourly_wage != null ? Number(row.hourly_wage) : null,
-      }))
-    );
-  }, [activeCompanyId, isAdmin, supabase]);
-
-  const ensureDefaultEmployeeGroup = useCallback(async () => {
-    if (!activeCompanyId || !isAdmin) {
-      throw new Error("Not allowed.");
-    }
-    const { count, error: countError } = await supabase
-      .from("employee_groups")
-      .select("id", { count: "exact", head: true })
-      .eq("company_id", activeCompanyId);
-    if (countError) throw new Error(countError.message);
-    if ((count ?? 0) > 0) {
-      await loadEmployeeGroups();
-      return;
-    }
-    const { error } = await supabase.from("employee_groups").insert({
-      company_id: activeCompanyId,
-      name: "General",
-      hourly_wage: null,
-    });
-    if (error) throw new Error(error.message);
-    await loadEmployeeGroups();
-  }, [activeCompanyId, isAdmin, loadEmployeeGroups, supabase]);
-
-  const refreshPendingInviteCount = useCallback(async () => {
-    if (!activeCompanyId || !isAdmin) {
-      setPendingInviteCount(0);
-      return;
-    }
-    const { count, error } = await supabase
-      .from("invites")
-      .select("id", { count: "exact", head: true })
-      .eq("company_id", activeCompanyId)
-      .eq("status", "pending");
-    if (!error) {
-      setPendingInviteCount(count ?? 0);
-    }
-  }, [activeCompanyId, isAdmin, supabase]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -235,6 +171,7 @@ export default function AppShell({
   const [employees, setEmployees] =
     useState<EmployeeConfig[]>([]);
   const [employeeGroups, setEmployeeGroups] = useState<EmployeeGroupRow[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [guidedSetupOpen, setGuidedSetupOpen] = useState(false);
@@ -260,6 +197,71 @@ export default function AppShell({
 
   const [authUserId, setAuthUserId] = useState<string | null>(null);
 
+  const [weekStart, setWeekStart] = useState<Date>(todayWeekStart);
+  const [selectedDate, setSelectedDate] = useState(todayDate);
+  const [form, setForm] = useState<FormState>(() => createDefaultForm(todayDate));
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [employeeFilter, setEmployeeFilter] = useState("All");
+  const [copyFromDate, setCopyFromDate] = useState(initialWeekDates[0].date);
+  const [availabilityDrafts, setAvailabilityDrafts] = useState<
+    Record<string, string>
+  >({});
+  const [newEmployeeForm, setNewEmployeeForm] = useState<NewEmployeeForm>(() =>
+    createNewEmployeeForm(companyDefaultHourlyWage)
+  );
+  const [reportTimesheetFrom, setReportTimesheetFrom] = useState(() => {
+    const { from } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
+    return from;
+  });
+  const [reportTimesheetTo, setReportTimesheetTo] = useState(() => {
+    const { to } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
+    return to;
+  });
+  const [reportTimesheetEmployee, setReportTimesheetEmployee] = useState("all");
+  const [reportTimesheetGroup, setReportTimesheetGroup] = useState("all");
+  const [payrollRangeMode, setPayrollRangeMode] = useState<"week" | "month" | "custom">("month");
+  const [payrollOverviewMonth, setPayrollOverviewMonth] = useState(() => new Date().getMonth() + 1);
+  const [payrollOverviewYear, setPayrollOverviewYear] = useState(currentYear);
+  const [payrollWeekStart, setPayrollWeekStart] = useState(() =>
+    startOfWeekWithPreference(new Date(), weekPref)
+  );
+  const [payrollCustomFrom, setPayrollCustomFrom] = useState(() => {
+    const { from } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
+    return from;
+  });
+  const [payrollCustomTo, setPayrollCustomTo] = useState(() => {
+    const { to } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
+    return to;
+  });
+  const [payrollTableEmployeeFilter, setPayrollTableEmployeeFilter] = useState("all");
+  const [payrollSelectedEmployee, setPayrollSelectedEmployee] = useState<string | null>(null);
+  const [, setShiftRoleMode] = useState<"preset" | "custom">("preset");
+  const [, setNewEmployeeRoleMode] = useState<"preset" | "custom">("preset");
+  const loadEmployeeGroups = useCallback(async () => {
+    if (!activeCompanyId || !isAdmin) {
+      setEmployeeGroups([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("employee_groups")
+      .select("id, name, hourly_wage")
+      .eq("company_id", activeCompanyId)
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.log("Error fetching employee groups:", error);
+      return;
+    }
+
+    setEmployeeGroups(
+      (data || []).map((row: { id: string; name: string; hourly_wage: number | null }) => ({
+        id: row.id,
+        name: row.name,
+        hourlyWage: row.hourly_wage != null ? Number(row.hourly_wage) : null,
+      }))
+    );
+  }, [activeCompanyId, isAdmin, supabase]);
+
   useEffect(() => {
     let cancelled = false;
     void supabase.auth.getUser().then(({ data }) => {
@@ -273,36 +275,50 @@ export default function AppShell({
   }, [supabase]);
 
   useEffect(() => {
-    if (!activeCompanyId) {
-      setPremiumOnboardingDone(false);
-      setPayrollVisited(false);
-      return;
-    }
-    try {
-      setPremiumOnboardingDone(
-        localStorage.getItem(ONBOARDING_DONE_STORAGE_PREFIX + activeCompanyId) === "1"
-      );
-      setPayrollVisited(
-        localStorage.getItem(PAYROLL_VISITED_STORAGE_PREFIX + activeCompanyId) === "1"
-      );
-    } catch {
-      setPremiumOnboardingDone(false);
-      setPayrollVisited(false);
-    }
+    queueMicrotask(() => {
+      if (!activeCompanyId) {
+        setPremiumOnboardingDone(false);
+        setPayrollVisited(false);
+        return;
+      }
+      try {
+        setPremiumOnboardingDone(
+          localStorage.getItem(ONBOARDING_DONE_STORAGE_PREFIX + activeCompanyId) === "1"
+        );
+        setPayrollVisited(
+          localStorage.getItem(PAYROLL_VISITED_STORAGE_PREFIX + activeCompanyId) === "1"
+        );
+      } catch {
+        setPremiumOnboardingDone(false);
+        setPayrollVisited(false);
+      }
+    });
   }, [activeCompanyId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("toast") === "invite_sent") {
-      setToastMessage("Invitation sent");
-      void refreshPendingInviteCount();
+      queueMicrotask(() => {
+        setToastMessage("Invitation sent");
+      });
+      void (async () => {
+        if (!activeCompanyId || !isAdmin) return;
+        const { count, error } = await supabase
+          .from("invites")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", activeCompanyId)
+          .eq("status", "pending");
+        if (!error) {
+          setPendingInviteCount(count ?? 0);
+        }
+      })();
       params.delete("toast");
       const qs = params.toString();
       const next = qs ? `?${qs}` : "";
       window.history.replaceState(null, "", `${window.location.pathname}${next}`);
     }
-  }, [refreshPendingInviteCount]);
+  }, [activeCompanyId, isAdmin, supabase]);
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -392,22 +408,26 @@ export default function AppShell({
       setShifts(mappedShifts);
     }
 
-    void fetchEmployees();
-    void fetchShifts();
-    void loadEmployeeGroups();
+    queueMicrotask(() => {
+      void fetchEmployees();
+      void fetchShifts();
+      void loadEmployeeGroups();
+    });
   }, [activeCompanyId, supabase, isAdmin, employeeName, authUserId, loadEmployeeGroups]);
 
   useEffect(() => {
-    if (
-      !isAdmin &&
-      (activeTab === "reports-timesheets" ||
-        activeTab === "payroll-overview" ||
-        activeTab === "payroll-employee" ||
-        activeTab === "employees" ||
-        activeTab === "employee-groups")
-    ) {
-      setActiveTab("schedule");
-    }
+    queueMicrotask(() => {
+      if (
+        !isAdmin &&
+        (activeTab === "reports-timesheets" ||
+          activeTab === "payroll-overview" ||
+          activeTab === "payroll-employee" ||
+          activeTab === "employees" ||
+          activeTab === "employee-groups")
+      ) {
+        setActiveTab("schedule");
+      }
+    });
   }, [isAdmin, activeTab]);
 
   const closeAllNavMenus = useCallback(() => {
@@ -517,52 +537,6 @@ export default function AppShell({
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(true);
   }, [isUserMenuOpen]);
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [weekStart, setWeekStart] = useState<Date>(todayWeekStart);
-  const [selectedDate, setSelectedDate] = useState(todayDate);
-  const [form, setForm] = useState<FormState>(() => createDefaultForm(todayDate));
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [employeeFilter, setEmployeeFilter] = useState("All");
-  const [copyFromDate, setCopyFromDate] = useState(initialWeekDates[0].date);
-  const [availabilityDrafts, setAvailabilityDrafts] = useState<
-    Record<string, string>
-  >({});
-  const [newEmployeeForm, setNewEmployeeForm] = useState<NewEmployeeForm>(() =>
-    createNewEmployeeForm(companyDefaultHourlyWage)
-  );
-  const [reportTimesheetFrom, setReportTimesheetFrom] = useState(() => {
-    const { from } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
-    return from;
-  });
-  const [reportTimesheetTo, setReportTimesheetTo] = useState(() => {
-    const { to } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
-    return to;
-  });
-  const [reportTimesheetEmployee, setReportTimesheetEmployee] = useState("all");
-  const [reportTimesheetGroup, setReportTimesheetGroup] = useState("all");
-  const [payrollRangeMode, setPayrollRangeMode] = useState<"week" | "month" | "custom">("month");
-  const [payrollOverviewMonth, setPayrollOverviewMonth] = useState(() => new Date().getMonth() + 1);
-  const [payrollOverviewYear, setPayrollOverviewYear] = useState(currentYear);
-  const [payrollWeekStart, setPayrollWeekStart] = useState(() =>
-    startOfWeekWithPreference(new Date(), weekPref)
-  );
-  const [payrollCustomFrom, setPayrollCustomFrom] = useState(() => {
-    const { from } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
-    return from;
-  });
-  const [payrollCustomTo, setPayrollCustomTo] = useState(() => {
-    const { to } = calendarMonthRange(new Date().getMonth() + 1, new Date().getFullYear());
-    return to;
-  });
-  const [payrollTableEmployeeFilter, setPayrollTableEmployeeFilter] = useState("all");
-  const [payrollSelectedEmployee, setPayrollSelectedEmployee] = useState<string | null>(null);
-  const [shiftRoleMode, setShiftRoleMode] = useState<"preset" | "custom">("preset");
-  const [newEmployeeRoleMode, setNewEmployeeRoleMode] = useState<"preset" | "custom">("preset");
-  const [employeePeriodFrom, setEmployeePeriodFrom] = useState(() => {
-    const now = new Date();
-    return toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1));
-  });
-  const [employeePeriodTo, setEmployeePeriodTo] = useState(todayDate);
 
   const sortedEmployeesData = useMemo(
     () => sortEmployeesForDisplay(employees),
@@ -680,21 +654,38 @@ export default function AppShell({
   }, [isAdmin, activeEmployees.length, shifts, homeWeekDateSet]);
 
   useEffect(() => {
-    void refreshPendingInviteCount();
-  }, [refreshPendingInviteCount, employees.length, shifts.length]);
+    queueMicrotask(() => {
+      void (async () => {
+        if (!activeCompanyId || !isAdmin) {
+          setPendingInviteCount(0);
+          return;
+        }
+        const { count, error } = await supabase
+          .from("invites")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", activeCompanyId)
+          .eq("status", "pending");
+        if (!error) {
+          setPendingInviteCount(count ?? 0);
+        }
+      })();
+    });
+  }, [activeCompanyId, isAdmin, supabase]);
 
   useEffect(() => {
     if (premiumOnboardingDone) {
-      resumeGuidedAfterShiftModalClose.current = false;
-      resumeGuidedWhenHome.current = false;
-      setGuidedSetupOpen(false);
-      try {
-        if (typeof window !== "undefined") {
-          window.sessionStorage.removeItem(GUIDED_KEEP_OPEN_KEY);
+      queueMicrotask(() => {
+        resumeGuidedAfterShiftModalClose.current = false;
+        resumeGuidedWhenHome.current = false;
+        setGuidedSetupOpen(false);
+        try {
+          if (typeof window !== "undefined") {
+            window.sessionStorage.removeItem(GUIDED_KEEP_OPEN_KEY);
+          }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
-      }
+      });
     }
   }, [premiumOnboardingDone]);
 
@@ -723,7 +714,9 @@ export default function AppShell({
       // ignore
     }
     if (shouldOpen) {
-      setGuidedSetupOpen(true);
+      queueMicrotask(() => {
+        setGuidedSetupOpen(true);
+      });
     }
   }, [isAdmin, premiumOnboardingDone, launchGuidedSetup]);
 
@@ -746,7 +739,9 @@ export default function AppShell({
     if (resumeGuidedAfterShiftModalClose.current && !showShiftForm) {
       resumeGuidedAfterShiftModalClose.current = false;
       if (!readGuidedDismissedSession()) {
-        setGuidedSetupOpen(true);
+        queueMicrotask(() => {
+          setGuidedSetupOpen(true);
+        });
       }
     }
   }, [isAdmin, premiumOnboardingDone, showShiftForm, readGuidedDismissedSession]);
@@ -759,7 +754,9 @@ export default function AppShell({
     if (resumeGuidedWhenHome.current && activeTab === "home") {
       resumeGuidedWhenHome.current = false;
       if (!readGuidedDismissedSession()) {
-        setGuidedSetupOpen(true);
+        queueMicrotask(() => {
+          setGuidedSetupOpen(true);
+        });
       }
     }
   }, [isAdmin, premiumOnboardingDone, activeTab, readGuidedDismissedSession]);
@@ -772,7 +769,9 @@ export default function AppShell({
 
   useEffect(() => {
     if (!isAdmin || !activeCompanyId || !showShiftForm) {
-      setShiftDayAvailabilityByEmployee({});
+      queueMicrotask(() => {
+        setShiftDayAvailabilityByEmployee({});
+      });
       return;
     }
     const date = form.date;
@@ -780,11 +779,13 @@ export default function AppShell({
       .map((e) => ({ name: e.name, userId: e.userId }))
       .filter((p): p is { name: string; userId: string } => Boolean(p.userId));
     if (pairs.length === 0) {
-      const noneMap: Record<string, string> = {};
-      activeEmployees.forEach((e) => {
-        noneMap[e.name] = "none";
+      queueMicrotask(() => {
+        const noneMap: Record<string, string> = {};
+        activeEmployees.forEach((e) => {
+          noneMap[e.name] = "none";
+        });
+        setShiftDayAvailabilityByEmployee(noneMap);
       });
-      setShiftDayAvailabilityByEmployee(noneMap);
       return;
     }
     let cancelled = false;
@@ -818,7 +819,15 @@ export default function AppShell({
     return () => {
       cancelled = true;
     };
-  }, [isAdmin, activeCompanyId, showShiftForm, activeEmployeesAvailabilityKey, supabase, activeEmployees]);
+  }, [
+    isAdmin,
+    activeCompanyId,
+    showShiftForm,
+    activeEmployeesAvailabilityKey,
+    supabase,
+    activeEmployees,
+    form.date,
+  ]);
 
   const selectedDayName = useMemo(
     () => getDayNameFromDate(selectedDate),
@@ -843,12 +852,14 @@ export default function AppShell({
     const existsInWeek = weekDates.some((item) => item.date === selectedDate);
     if (!existsInWeek) {
       const anchor = startOfWeekWithPreference(fromDateInputValue(selectedDate), weekPref);
-      setWeekStart(anchor);
-      setCopyFromDate(selectedDate);
-      setForm((current) => ({
-        ...current,
-        date: selectedDate,
-      }));
+      queueMicrotask(() => {
+        setWeekStart(anchor);
+        setCopyFromDate(selectedDate);
+        setForm((current) => ({
+          ...current,
+          date: selectedDate,
+        }));
+      });
     }
   }, [weekDates, selectedDate, weekPref]);
 
@@ -856,17 +867,21 @@ export default function AppShell({
     const selectedEmployeeStillActive = activeEmployeeNames.includes(form.employee);
 
     if (!selectedEmployeeStillActive && activeEmployees.length > 0) {
-      setForm((current) => ({
-        ...current,
-        employee: activeEmployees[0].name,
-        role: activeEmployees[0].defaultRole,
-      }));
+      queueMicrotask(() => {
+        setForm((current) => ({
+          ...current,
+          employee: activeEmployees[0].name,
+          role: activeEmployees[0].defaultRole,
+        }));
+      });
     }
   }, [activeEmployeeNames, activeEmployees, form.employee]);
 
   useEffect(() => {
     if (employeeFilter !== "All" && !employeeNames.includes(employeeFilter)) {
-      setEmployeeFilter("All");
+      queueMicrotask(() => {
+        setEmployeeFilter("All");
+      });
     }
   }, [employeeFilter, employeeNames]);
 
@@ -889,34 +904,16 @@ export default function AppShell({
     [employeeFilter, employeeNames, employees]
   );
 
-  const selectedDateTotals = useMemo(() => {
-    const totals: Record<string, { planned: number; worked: number }> = {};
-    for (const employee of employeeNames) {
-      totals[employee] = { planned: 0, worked: 0 };
-    }
-
-    shifts.forEach((shift) => {
-      if (shift.date !== selectedDate) return;
-      if (!totals[shift.employee]) {
-        totals[shift.employee] = { planned: 0, worked: 0 };
-      }
-      totals[shift.employee].planned += getPlannedHours(shift);
-      totals[shift.employee].worked += getWorkedHours(shift);
-    });
-
-    return totals;
-  }, [shifts, selectedDate, employeeNames]);
-
   const dayHours = useMemo(() => {
     return filteredShifts.reduce(
       (sum, shift) => sum + getPlannedHours(shift),
       0
     );
-  }, [filteredShifts, getPlannedHours]);
+  }, [filteredShifts]);
 
   const dayWorkedHours = useMemo(() => {
     return filteredShifts.reduce((sum, shift) => sum + getWorkedHours(shift), 0);
-  }, [filteredShifts, getWorkedHours]);
+  }, [filteredShifts]);
 
   // Employee personal stats (for employee mode)
   const myStats = useMemo(() => {
@@ -941,34 +938,6 @@ export default function AppShell({
 
     return { planned, worked, approved, shifts: shiftsCount };
   }, [shifts, employeeName]);
-
-  const employeePeriodRows = useMemo(() => {
-    if (!employeeName) return [];
-
-    return shifts
-      .filter((shift) => {
-        if (shift.employee !== employeeName) return false;
-        if (employeePeriodFrom && shift.date < employeePeriodFrom) return false;
-        if (employeePeriodTo && shift.date > employeePeriodTo) return false;
-        return true;
-      })
-      .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
-  }, [shifts, employeeName, employeePeriodFrom, employeePeriodTo]);
-
-  const employeePeriodStats = useMemo(() => {
-    return employeePeriodRows.reduce(
-      (acc, shift) => {
-        acc.shifts += 1;
-        acc.planned += getPlannedHours(shift);
-        acc.worked += getWorkedHours(shift);
-        if (shift.approved) {
-          acc.approved += getWorkedHours(shift);
-        }
-        return acc;
-      },
-      { shifts: 0, planned: 0, worked: 0, approved: 0 }
-    );
-  }, [employeePeriodRows]);
 
   const yearsAvailable = useMemo(() => {
     const years = new Set<number>();
@@ -1034,13 +1003,7 @@ export default function AppShell({
       return `${monthNames[payrollOverviewMonth]} ${payrollOverviewYear}`;
     }
     return `${from} – ${to}`;
-  }, [
-    payrollRangeBounds,
-    payrollRangeMode,
-    payrollOverviewMonth,
-    payrollOverviewYear,
-    monthNames,
-  ]);
+  }, [payrollRangeBounds, payrollRangeMode, payrollOverviewMonth, payrollOverviewYear]);
 
   const payrollBaseShiftsInRange = useMemo(() => {
     const { from, to } = payrollRangeBounds;
@@ -1105,7 +1068,9 @@ export default function AppShell({
 
   useEffect(() => {
     if (isAdmin && activeTab === "payroll-employee" && !payrollSelectedEmployee) {
-      setActiveTab("payroll-overview");
+      queueMicrotask(() => {
+        setActiveTab("payroll-overview");
+      });
     }
   }, [isAdmin, activeTab, payrollSelectedEmployee]);
 
@@ -1531,8 +1496,10 @@ export default function AppShell({
         roundTime(targetShift.end)
       );
       await setShiftApproval(shiftId, true);
-    } catch (error: any) {
-      alert(`Could not approve shift as planned: ${error.message}`);
+    } catch (error: unknown) {
+      alert(
+        `Could not approve shift as planned: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -1559,36 +1526,11 @@ export default function AppShell({
           await setShiftApproval(shift.id, true);
         })
       );
-    } catch (error: any) {
-      alert(`Could not approve all shifts for this day: ${error.message}`);
+    } catch (error: unknown) {
+      alert(
+        `Could not approve all shifts for this day: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  }
-
-  function goToPreviousWeek() {
-    const newWeekStart = addDays(weekStart, -7);
-    const newWeekDates = getWeekDates(newWeekStart, weekPref);
-    setWeekStart(newWeekStart);
-    setSelectedDate(newWeekDates[0].date);
-    setCopyFromDate(newWeekDates[0].date);
-    setForm((current) => ({ ...current, date: newWeekDates[0].date }));
-  }
-
-  function goToNextWeek() {
-    const newWeekStart = addDays(weekStart, 7);
-    const newWeekDates = getWeekDates(newWeekStart, weekPref);
-    setWeekStart(newWeekStart);
-    setSelectedDate(newWeekDates[0].date);
-    setCopyFromDate(newWeekDates[0].date);
-    setForm((current) => ({ ...current, date: newWeekDates[0].date }));
-  }
-
-  function goToThisWeek() {
-    const newWeekStart = startOfWeekWithPreference(new Date(), weekPref);
-    const newWeekDates = getWeekDates(newWeekStart, weekPref);
-    setWeekStart(newWeekStart);
-    setSelectedDate(todayDate);
-    setCopyFromDate(newWeekDates[0].date);
-    setForm((current) => ({ ...current, date: todayDate }));
   }
 
   async function updateEmployeeRate(name: string, newRate: number) {
@@ -1597,7 +1539,7 @@ export default function AppShell({
       return;
     }
 
-    const emp = employees.find((e: any) => e.name === name);
+    const emp = employees.find((e) => e.name === name);
     if (!emp) return;
 
     const safeRate = Number.isNaN(newRate) ? 0 : newRate;
@@ -1613,7 +1555,7 @@ export default function AppShell({
       return;
     }
 
-    setEmployees((current: any[]) =>
+    setEmployees((current) =>
       current.map((employee) =>
         employee.name === name ? { ...employee, hourlyRate: safeRate } : employee
       )
@@ -1626,7 +1568,7 @@ export default function AppShell({
       return;
     }
 
-    const emp = employees.find((e: any) => e.name === name);
+    const emp = employees.find((e) => e.name === name);
     if (!emp) return;
 
     const trimmedRole = newRole.trim() || "Kitchen";
@@ -1642,7 +1584,7 @@ export default function AppShell({
       return;
     }
 
-    setEmployees((current: any[]) =>
+    setEmployees((current) =>
       current.map((employee) =>
         employee.name === name ? { ...employee, defaultRole: trimmedRole } : employee
       )
@@ -1828,7 +1770,7 @@ export default function AppShell({
       return;
     }
 
-    const employee = employees.find((item: any) => item.name === name);
+    const employee = employees.find((item) => item.name === name);
     if (!employee) return;
 
     const hasShifts = shifts.some((shift) => shift.employee === name);
@@ -1861,9 +1803,7 @@ export default function AppShell({
       return;
     }
 
-    setEmployees((current: any[]) =>
-      current.filter((employeeItem) => employeeItem.name !== name)
-    );
+    setEmployees((current) => current.filter((employeeItem) => employeeItem.name !== name));
 
     if (form.employee === name) {
       const replacement = sortEmployeesForDisplay(
@@ -2064,18 +2004,18 @@ export default function AppShell({
     }
     const data = result.employee;
 
-    const newEmployee: any = {
-      id: data.id,
-      name: data.name,
-      hourlyRate: data.hourly_rate,
-      defaultRole: data.default_role,
-      unavailableDates: data.unavailable_dates || [],
-      active: data.active,
+    const newEmployee: EmployeeConfig = {
+      id: String(data.id),
+      name: String(data.name),
+      hourlyRate: Number(data.hourly_rate),
+      defaultRole: String(data.default_role),
+      unavailableDates: Array.isArray(data.unavailable_dates) ? data.unavailable_dates : [],
+      active: Boolean(data.active),
       groupId:
         (data as { employee_group_id?: string | null }).employee_group_id ?? null,
     };
 
-    setEmployees((current: any[]) => [...current, newEmployee]);
+    setEmployees((current) => [...current, newEmployee]);
 
     if (activeEmployees.length === 0) {
       setForm((current) => ({
@@ -2234,8 +2174,10 @@ export default function AppShell({
 
     try {
       await updateShiftActualTimes(id, null, null);
-    } catch (error: any) {
-      alert(`Could not reset actual times: ${error.message}`);
+    } catch (error: unknown) {
+      alert(
+        `Could not reset actual times: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -2478,152 +2420,6 @@ export default function AppShell({
     printWindow.document.write(reportHtml);
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
-  }
-
-  function downloadMyPeriodTimesheetCsv() {
-    if (!employeeName) {
-      alert("No employee account found.");
-      return;
-    }
-
-    const rows = [
-      ["Company", workspaceName],
-      ["CVR", workspaceCvr],
-      ["Employee", employeeName],
-      ["From", employeePeriodFrom || ""],
-      ["To", employeePeriodTo || ""],
-      [],
-      [
-        "Date",
-        "Day",
-        "Role",
-        "Planned Start",
-        "Planned End",
-        "Planned Hours",
-        "Actual In",
-        "Actual Out",
-        "Worked Hours",
-        "Approved",
-        "Notes",
-      ],
-      ...employeePeriodRows.map((shift) => [
-        shift.date,
-        shift.day,
-        shift.role,
-        shift.start,
-        shift.end,
-        getPlannedHours(shift).toFixed(1),
-        shift.actualStart || "",
-        shift.actualEnd || "",
-        getWorkedHours(shift).toFixed(1),
-        shift.approved ? "Yes" : "No",
-        (shift.notes || "").split(",").join(";"),
-      ]),
-      [],
-      [
-        "Totals",
-        "",
-        "",
-        "",
-        "",
-        employeePeriodStats.planned.toFixed(1),
-        "",
-        "",
-        employeePeriodStats.worked.toFixed(1),
-        employeePeriodStats.approved.toFixed(1),
-        "",
-      ],
-    ];
-
-    const csvContent = rows.map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-
-    const safeEmployee = employeeName.split(" ").join("-").toLowerCase();
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      safeEmployee + "-" + (employeePeriodFrom || "from") + "-" + (employeePeriodTo || "to") + "-timesheet.csv"
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  function downloadMyPeriodTimesheetPdf() {
-    if (!employeeName) {
-      alert("No employee account found.");
-      return;
-    }
-
-    const employeeRate = employeeRateMap[employeeName] || 0;
-    const approvedPayrollEstimate = employeePeriodStats.approved * employeeRate;
-
-    const rowsHtml = employeePeriodRows.length === 0
-      ? '<tr><td colspan="10">No shifts found for this period.</td></tr>'
-      : employeePeriodRows
-          .map(
-            (shift) =>
-              '<tr>' +
-              '<td>' + shift.date + '</td>' +
-              '<td>' + shift.day + '</td>' +
-              '<td>' + shift.role + '</td>' +
-              '<td>' + shift.start + ' - ' + shift.end + '</td>' +
-              '<td>' + getPlannedHours(shift).toFixed(1) + '</td>' +
-              '<td>' + (shift.actualStart || '—') + '</td>' +
-              '<td>' + (shift.actualEnd || '—') + '</td>' +
-              '<td>' + getWorkedHours(shift).toFixed(1) + '</td>' +
-              '<td>' + (shift.approved ? 'Yes' : 'No') + '</td>' +
-              '<td>' + (shift.notes || '') + '</td>' +
-              '</tr>'
-          )
-          .join('');
-
-    const reportHtml =
-      '<html><head><title>Employee Period Timesheet</title><style>' +
-      'body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }' +
-      'h1, h2, p { margin: 0 0 10px 0; }' +
-      '.header { margin-bottom: 24px; }' +
-      '.summary { margin: 20px 0; padding: 16px; border: 1px solid #d1d5db; border-radius: 12px; }' +
-      'table { width: 100%; border-collapse: collapse; margin-top: 16px; }' +
-      'th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 12px; }' +
-      'th { background: #f3f4f6; }' +
-      '.footer { margin-top: 24px; }' +
-      '</style></head><body>' +
-      '<div class="header">' +
-      '<h1>' + workspaceName + '</h1>' +
-      '<p>CVR: ' + workspaceCvr + '</p>' +
-      '<p>Employee Period Timesheet</p>' +
-      '<p><strong>Employee:</strong> ' + employeeName + '</p>' +
-      '<p><strong>Period:</strong> ' + (employeePeriodFrom || '—') + ' to ' + (employeePeriodTo || '—') + '</p>' +
-      '</div>' +
-      '<div class="summary">' +
-      '<p><strong>Total Planned Hours:</strong> ' + employeePeriodStats.planned.toFixed(1) + ' hrs</p>' +
-      '<p><strong>Total Worked Hours:</strong> ' + employeePeriodStats.worked.toFixed(1) + ' hrs</p>' +
-      '<p><strong>Total Approved Hours:</strong> ' + employeePeriodStats.approved.toFixed(1) + ' hrs</p>' +
-      '<p><strong>Approved Payroll Estimate:</strong> ' + formatCurrency(approvedPayrollEstimate) + '</p>' +
-      '</div>' +
-      '<table><thead><tr><th>Date</th><th>Day</th><th>Role</th><th>Planned</th><th>Planned Hours</th><th>Actual In</th><th>Actual Out</th><th>Worked Hours</th><th>Approved</th><th>Notes</th></tr></thead><tbody>' +
-      rowsHtml +
-      '</tbody></table>' +
-      '<div class="footer"><p><strong>Prepared by:</strong> ' + workspaceName + '</p><p><strong>Signature:</strong> ________________________________</p></div>' +
-      '</body></html>';
-
-    const printWindow = window.open("", "_blank", "width=1000,height=800");
-    if (!printWindow) {
-      alert("Popup blocked. Please allow popups to export PDF.");
-      return;
-    }
-
-    printWindow.document.open();
-    printWindow.document.write(reportHtml);
-    printWindow.document.close();
-    printWindow.focus();
-
     setTimeout(() => {
       printWindow.print();
     }, 500);
@@ -2909,66 +2705,54 @@ export default function AppShell({
   const hasApprovedShifts = shifts.some((shift) => shift.approved);
   const hasRateConfigured = employees.some((employee) => employee.hourlyRate > 0);
 
-  const setupCards = useMemo<SetupCard[]>(
-    () => [
-      {
-        id: "team",
-        title: "Set up your team",
-        description: "Add your first employees and define default roles.",
-        status: hasEmployees ? "completed" : "not_started",
-        actionLabel: hasEmployees ? "Manage employees" : "Add employees",
-        onAction: openAddEmployeeFromHeader,
-      },
-      {
-        id: "schedule",
-        title: "Start scheduling",
-        description: "Create your first shift and plan this week.",
-        status: hasShifts ? "completed" : hasEmployees ? "in_progress" : "not_started",
-        actionLabel: hasShifts ? "Open schedule" : "Create first shift",
-        onAction: openCreateShiftFromHeader,
-      },
-      {
-        id: "payroll",
-        title: "Review payroll setup",
-        description: "Check rates, worked hours, and payroll visibility.",
-        status: hasApprovedShifts || (hasShifts && hasRateConfigured)
-          ? "completed"
-          : hasEmployees
-          ? "in_progress"
-          : "not_started",
-        actionLabel: "Open payroll",
-        onAction: openPayrollOverviewFromHome,
-      },
-      {
-        id: "invite",
-        title: "Invite your team",
-        description: "Send access invites so staff can view shifts and clock in/out.",
-        status: hasEmployees ? "in_progress" : "not_started",
-        actionLabel: "Invite team",
-        onAction: openInviteTeamFromHome,
-      },
-      {
-        id: "checks",
-        title: "Final checks",
-        description: "Confirm your team and schedule are ready for operations.",
-        status: hasEmployees && hasShifts ? "completed" : "not_started",
-        actionLabel: "Open schedule",
-        onAction: openCreateShiftFromHeader,
-      },
-    ],
-    [
-      hasApprovedShifts,
-      hasEmployees,
-      hasRateConfigured,
-      hasShifts,
-      openAddEmployeeFromHeader,
-      openCreateShiftFromHeader,
-      openInviteTeamFromHome,
-      openPayrollOverviewFromHome,
-    ]
-  );
+  const setupCards: SetupCard[] = [
+    {
+      id: "team",
+      title: "Set up your team",
+      description: "Add your first employees and define default roles.",
+      status: hasEmployees ? "completed" : "not_started",
+      actionLabel: hasEmployees ? "Manage employees" : "Add employees",
+      onAction: openAddEmployeeFromHeader,
+    },
+    {
+      id: "schedule",
+      title: "Start scheduling",
+      description: "Create your first shift and plan this week.",
+      status: hasShifts ? "completed" : hasEmployees ? "in_progress" : "not_started",
+      actionLabel: hasShifts ? "Open schedule" : "Create first shift",
+      onAction: openCreateShiftFromHeader,
+    },
+    {
+      id: "payroll",
+      title: "Review payroll setup",
+      description: "Check rates, worked hours, and payroll visibility.",
+      status: hasApprovedShifts || (hasShifts && hasRateConfigured)
+        ? "completed"
+        : hasEmployees
+        ? "in_progress"
+        : "not_started",
+      actionLabel: "Open payroll",
+      onAction: openPayrollOverviewFromHome,
+    },
+    {
+      id: "invite",
+      title: "Invite your team",
+      description: "Send access invites so staff can view shifts and clock in/out.",
+      status: hasEmployees ? "in_progress" : "not_started",
+      actionLabel: "Invite team",
+      onAction: openInviteTeamFromHome,
+    },
+    {
+      id: "checks",
+      title: "Final checks",
+      description: "Confirm your team and schedule are ready for operations.",
+      status: hasEmployees && hasShifts ? "completed" : "not_started",
+      actionLabel: "Open schedule",
+      onAction: openCreateShiftFromHeader,
+    },
+  ];
 
-  const guidedChecklistSteps: GuidedChecklistStep[] = (() => {
+  const guidedTourSteps: GuidedChecklistStep[] = (() => {
     const teamDone = employees.length > 1;
     const shiftDone = shifts.length > 0;
     const inviteDone = pendingInviteCount > 0;
@@ -3019,11 +2803,23 @@ export default function AppShell({
     ];
   })();
 
-  const guidedHighlightIndex = (() => {
-    const idx = guidedChecklistSteps.findIndex((s) => !s.done);
-    if (idx === -1) return Math.max(0, guidedChecklistSteps.length - 1);
-    return idx;
-  })();
+  const guidedHighlightIndex = useMemo(() => {
+    const flags = [
+      employees.length > 1,
+      shifts.length > 0,
+      pendingInviteCount > 0,
+      payrollVisited,
+      premiumOnboardingDone,
+    ];
+    const firstOpen = flags.findIndex((d) => !d);
+    return firstOpen === -1 ? Math.max(0, flags.length - 1) : firstOpen;
+  }, [
+    employees.length,
+    shifts.length,
+    pendingInviteCount,
+    payrollVisited,
+    premiumOnboardingDone,
+  ]);
 
   return (
     <main className="flex min-h-screen w-full flex-col bg-slate-200/40 text-slate-900">
@@ -3082,7 +2878,7 @@ export default function AppShell({
         {isAdmin ? (
           <GuidedWorkspaceSetup
             open={guidedSetupOpen && !premiumOnboardingDone}
-            steps={guidedChecklistSteps}
+            steps={guidedTourSteps}
             currentIndex={guidedHighlightIndex}
             onDismiss={dismissGuidedSetup}
           />

@@ -167,7 +167,6 @@ async function getAuthenticatedUserWithSingleRetry(supabase: SupabaseClient) {
 }
 
 export async function continueCompleteAccount(formData: FormData) {
-  const supabase = await createServerSupabaseClient();
   const email = String(formData.get("email") || "").trim().toLowerCase();
 
   if (!email) {

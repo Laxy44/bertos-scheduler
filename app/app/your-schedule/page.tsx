@@ -78,7 +78,7 @@ export default async function YourSchedulePage() {
   if (employeeName) {
     const { data, error } = await supabase
       .from("shifts")
-      .select("*")
+      .select("id, employee, date, role, start, end, notes, actual_start, actual_end, approved")
       .eq("company_id", activeCompanyId)
       .eq("employee", employeeName)
       .order("date", { ascending: true })

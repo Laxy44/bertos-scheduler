@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { updateEmployeeWorkspaceSettingsAction, updateWorkspaceMemberRoleAction } from "@/app/app/settings/actions";
 import type { MemberRow } from "@/app/app/settings/actions";
@@ -22,6 +23,7 @@ export default function EmployeeSettingsForm({
   initialShowPhone,
   members,
 }: Props) {
+  const router = useRouter();
   const [showEmail, setShowEmail] = useState(initialShowEmail);
   const [showPhone, setShowPhone] = useState(initialShowPhone);
   const [memberMsg, setMemberMsg] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export default function EmployeeSettingsForm({
     startTransition(async () => {
       const res = await updateWorkspaceMemberRoleAction({ userId, access });
       setMemberMsg(res.ok ? "Role updated." : res.error);
-      if (res.ok) window.location.reload();
+      if (res.ok) router.refresh();
     });
   }
 

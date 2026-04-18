@@ -1,7 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { addDays, formatWeekRange, getWeekDates } from "../../lib/utils";
+import type { FormState } from "../../types/schedule";
+
+type WeekNavigatorProps = {
+  weekStart: Date;
+  goPrev: () => void;
+  goNext: () => void;
+  goToday: () => void;
+  setWeekStart: (d: Date) => void;
+  setSelectedDate: (date: string) => void;
+  setCopyFromDate: (date: string) => void;
+  setForm: Dispatch<SetStateAction<FormState>>;
+};
 
 export default function WeekNavigator({
   weekStart,
@@ -12,7 +24,7 @@ export default function WeekNavigator({
   setSelectedDate,
   setCopyFromDate,
   setForm,
-}: any) {
+}: WeekNavigatorProps) {
   const [open, setOpen] = useState(false);
 
   const current = formatWeekRange(weekStart);
@@ -61,7 +73,7 @@ export default function WeekNavigator({
                     setWeekStart(w.start);
                     setSelectedDate(newDates[0].date);
                     setCopyFromDate(newDates[0].date);
-                    setForm((c: any) => ({ ...c, date: newDates[0].date }));
+                    setForm((c) => ({ ...c, date: newDates[0].date }));
                     setOpen(false);
                   }}
                   className="cursor-pointer px-4 py-3 text-sm hover:bg-slate-100"

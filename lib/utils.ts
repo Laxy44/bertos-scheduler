@@ -212,31 +212,37 @@ export function isValidFullTime(value: string) {
 export function normalizeEmployeesData(data: unknown): EmployeeConfig[] {
   if (!Array.isArray(data)) return defaultEmployees;
 
-  return data.map((e: any) => ({
-    name: e.name || "",
-    hourlyRate: e.hourlyRate || 0,
-    defaultRole: e.defaultRole || "Kitchen",
-    unavailableDates: e.unavailableDates || [],
-    active: e.active ?? true,
-    groupId: e.groupId ?? null,
-  }));
+  return data.map((e: unknown) => {
+    const r = e as Record<string, unknown>;
+    return {
+      name: String(r.name ?? ""),
+      hourlyRate: Number(r.hourlyRate ?? 0),
+      defaultRole: String(r.defaultRole ?? "Kitchen"),
+      unavailableDates: Array.isArray(r.unavailableDates) ? r.unavailableDates : [],
+      active: r.active !== false,
+      groupId: (r.groupId as string | null | undefined) ?? null,
+    };
+  });
 }
 
 export function normalizeShiftsData(data: unknown): Shift[] {
   if (!Array.isArray(data)) return [];
 
-  return data.map((s: any) => ({
-    id: s.id || Date.now(),
-    employee: s.employee || "",
-    day: s.day || "",
-    role: s.role || "Kitchen",
-    start: s.start || "10:00",
-    end: s.end || "15:00",
-    notes: s.notes || "",
-    date: s.date || toDateInputValue(new Date()),
-    actualStart: s.actualStart,
-    actualEnd: s.actualEnd,
-  }));
+  return data.map((s: unknown) => {
+    const r = s as Record<string, unknown>;
+    return {
+      id: String(r.id ?? Date.now()),
+      employee: String(r.employee ?? ""),
+      day: String(r.day ?? ""),
+      role: String(r.role ?? "Kitchen"),
+      start: String(r.start ?? "10:00"),
+      end: String(r.end ?? "15:00"),
+      notes: String(r.notes ?? ""),
+      date: String(r.date ?? toDateInputValue(new Date())),
+      actualStart: r.actualStart != null ? String(r.actualStart) : undefined,
+      actualEnd: r.actualEnd != null ? String(r.actualEnd) : undefined,
+    };
+  });
 }
 
 export function getCurrentTimeString() {

@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getMonthCalendarDays } from "../../../lib/utils";
@@ -43,7 +42,9 @@ export default function MonthScheduleView({
   const [detailsDate, setDetailsDate] = useState<string | null>(null);
 
   useEffect(() => {
-    setDetailsDate(null);
+    queueMicrotask(() => {
+      setDetailsDate(null);
+    });
   }, [month, year]);
 
   const cells = useMemo(() => getMonthCalendarDays(month, year), [month, year]);

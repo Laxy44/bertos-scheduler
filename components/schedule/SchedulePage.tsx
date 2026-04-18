@@ -75,7 +75,10 @@ export default function SchedulePage(props: any) {
 
   const weekStartsOn: WeekStartPreference = props.weekStartsOn ?? "monday";
 
-  const safeSetWeekStart = setWeekStart ?? (() => {});
+  const safeSetWeekStart = useMemo(
+    () => setWeekStart ?? (() => {}),
+    [setWeekStart]
+  );
 
   const [scheduleView, setScheduleView] = useState<ScheduleViewKind>("week");
   const [selectedShiftIds, setSelectedShiftIds] = useState<string[]>([]);
@@ -92,14 +95,18 @@ export default function SchedulePage(props: any) {
       props.weekStart instanceof Date ? props.weekStart : new Date(props.weekStart),
       weekStartsOn
     );
-    setNavigatorAnchor((prev) => (prev.getTime() === anchor.getTime() ? prev : anchor));
+    queueMicrotask(() => {
+      setNavigatorAnchor((prev) => (prev.getTime() === anchor.getTime() ? prev : anchor));
+    });
   }, [props.weekStart, scheduleView, weekStartsOn]);
 
   useEffect(() => {
     if (scheduleView !== "day") return;
     const d = fromDateInputValue(selectedDate);
     d.setHours(0, 0, 0, 0);
-    setNavigatorAnchor((prev) => (prev.getTime() === d.getTime() ? prev : d));
+    queueMicrotask(() => {
+      setNavigatorAnchor((prev) => (prev.getTime() === d.getTime() ? prev : d));
+    });
   }, [selectedDate, scheduleView]);
 
   const handleViewKindChange = useCallback(
@@ -348,7 +355,9 @@ export default function SchedulePage(props: any) {
   }, [setOpenMenuId]);
 
   useEffect(() => {
-    setSelectedShiftIds([]);
+    queueMicrotask(() => {
+      setSelectedShiftIds([]);
+    });
   }, [selectedDate]);
 
   useEffect(() => {
