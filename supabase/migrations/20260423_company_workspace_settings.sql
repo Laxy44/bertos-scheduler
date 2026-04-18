@@ -1,23 +1,23 @@
+-- Idempotent: safe to re-run manually (no DROP TABLE / no DELETE).
 -- Minimal workspace configuration (general, schedule JSON, payroll defaults).
--- Extend later for integrations, advanced payroll, leave, etc.
 
-alter table public.companies
-  add column if not exists timezone text default 'Europe/Copenhagen';
+ALTER TABLE public.companies
+  ADD COLUMN IF NOT EXISTS timezone text DEFAULT 'Europe/Copenhagen';
 
-alter table public.companies
-  add column if not exists week_starts_on text default 'monday';
+ALTER TABLE public.companies
+  ADD COLUMN IF NOT EXISTS week_starts_on text DEFAULT 'monday';
 
-alter table public.companies
-  add column if not exists currency text default 'DKK';
+ALTER TABLE public.companies
+  ADD COLUMN IF NOT EXISTS currency text DEFAULT 'DKK';
 
-alter table public.companies
-  add column if not exists default_hourly_wage numeric(12,2);
+ALTER TABLE public.companies
+  ADD COLUMN IF NOT EXISTS default_hourly_wage numeric(12, 2);
 
-alter table public.companies
-  add column if not exists workspace_settings jsonb not null default '{}'::jsonb;
+ALTER TABLE public.companies
+  ADD COLUMN IF NOT EXISTS workspace_settings jsonb NOT NULL DEFAULT '{}'::jsonb;
 
-alter table public.companies drop constraint if exists companies_week_starts_on_check;
+ALTER TABLE public.companies DROP CONSTRAINT IF EXISTS companies_week_starts_on_check;
 
-alter table public.companies
-  add constraint companies_week_starts_on_check
-  check (week_starts_on is null or lower(week_starts_on) in ('monday', 'sunday'));
+ALTER TABLE public.companies
+  ADD CONSTRAINT companies_week_starts_on_check
+  CHECK (week_starts_on IS NULL OR lower(week_starts_on) IN ('monday', 'sunday'));

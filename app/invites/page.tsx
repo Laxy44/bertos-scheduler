@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 import { cancelInvite, createInvite, resendInvite } from "./actions";
 
@@ -27,39 +28,16 @@ export default async function InvitesPage({
     redirect("/login?message=Please log in to manage invites");
   }
 
-  const membership = await supabase
-    .from("company_members")
-    .select(
-      `
-        company_id,
-        role,
-        companies (
-          name
-        )
-      `
-    )
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .order("company_id", { ascending: true })
-    .limit(2);
-
-  if (membership.error || !(membership.data || []).length) {
+  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
+  if (workspace.kind === "conflict") {
+    redirect("/workspace-conflict");
+  }
+  if (workspace.kind === "none") {
     redirect("/create-company?message=Create a company first");
   }
 
-  if ((membership.data || []).length > 1) {
-    redirect("/workspace-conflict");
-  }
-
-  const activeMembership = membership.data![0];
-  const companyRow = activeMembership.companies as
-    | { name: string | null }
-    | { name: string | null }[]
-    | null
-    | undefined;
-  const companyName = Array.isArray(companyRow)
-    ? companyRow[0]?.name
-    : companyRow?.name;
+  const activeMembership = workspace.membership;
+  const companyName = workspace.company?.name ?? null;
 
   const role = (activeMembership.role || "").toLowerCase();
   if (!["owner", "admin"].includes(role)) {

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isCompanyAdminRole } from "@/lib/workspace-role";
 
@@ -36,53 +37,38 @@ export async function requireSettingsAdmin(): Promise<SettingsAdminContext> {
     redirect("/login?message=Please log in to open settings");
   }
 
-  const membershipQuery = await supabase
-    .from("company_members")
-    .select(
-      `
-        company_id,
-        role,
-        companies (
-          id,
-          name,
-          cvr,
-          timezone,
-          week_starts_on,
-          currency,
-          default_hourly_wage,
-          workspace_settings
-        )
-      `
-    )
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .order("company_id", { ascending: true })
-    .limit(2);
-
-  if (membershipQuery.error) {
-    console.error("[settings] membership", membershipQuery.error.message);
-    redirect("/?message=Could not load workspace");
-  }
-
-  const rows = membershipQuery.data || [];
-  if (rows.length > 1) {
+  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
+  if (workspace.kind === "conflict") {
     redirect("/workspace-conflict");
   }
-
-  const row = rows[0];
-  const companyId = row?.company_id ?? null;
-  const membershipRole = (row?.role || "").trim();
-  if (!companyId || !isCompanyAdminRole(membershipRole)) {
-    redirect("/?message=Only workspace admins can change settings");
-  }
-
-  const rawCompany = row?.companies;
-  const companyBundle = Array.isArray(rawCompany) ? rawCompany[0] : rawCompany;
-  if (!companyBundle || typeof companyBundle !== "object" || !("id" in companyBundle)) {
+  if (workspace.kind === "none") {
     redirect("/create-company?message=Create a workspace first");
   }
 
-  const company = companyBundle as CompanySettingsRow;
+  const companyId = workspace.membership.company_id;
+  const membershipRole = (workspace.membership.role || "").trim();
+  if (!isCompanyAdminRole(membershipRole)) {
+    redirect("/?message=Only workspace admins can change settings");
+  }
+
+  const companyRes = await supabase
+    .from("companies")
+    .select(
+      "id, name, cvr, timezone, week_starts_on, currency, default_hourly_wage, workspace_settings"
+    )
+    .eq("id", companyId)
+    .maybeSingle<CompanySettingsRow>();
+
+  if (companyRes.error) {
+    console.error("[settings] company", companyRes.error.message);
+    redirect("/?message=Could not load workspace");
+  }
+
+  if (!companyRes.data) {
+    redirect("/?message=Could not load workspace");
+  }
+
+  const company = companyRes.data;
   const workspaceSettings = parseWorkspaceSettings(company.workspace_settings);
 
   return {

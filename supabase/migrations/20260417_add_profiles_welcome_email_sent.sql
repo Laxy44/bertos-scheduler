@@ -1,2 +1,4 @@
-alter table public.profiles
-add column if not exists welcome_email_sent boolean not null default false;
+-- Idempotent: safe to re-run manually (no DROP TABLE / no DELETE).
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS welcome_email_sent boolean NOT NULL DEFAULT false;

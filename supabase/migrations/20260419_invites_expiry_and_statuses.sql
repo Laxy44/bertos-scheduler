@@ -1,17 +1,19 @@
--- Richer invite lifecycle for production invite flows.
-alter table public.invites drop constraint if exists invites_status_check;
+-- Idempotent: safe to re-run manually (no DROP TABLE / no DELETE).
+-- Richer invite lifecycle: widened status CHECK + optional expiry column and default.
 
-alter table public.invites
-  add constraint invites_status_check
-  check (status in ('pending', 'accepted', 'expired', 'revoked'));
+ALTER TABLE public.invites DROP CONSTRAINT IF EXISTS invites_status_check;
 
-alter table public.invites
-  add column if not exists expires_at timestamptz;
+ALTER TABLE public.invites
+  ADD CONSTRAINT invites_status_check
+  CHECK (status IN ('pending', 'accepted', 'expired', 'revoked'));
 
--- Backfill: invites without expiry get 14 days from creation.
-update public.invites
-set expires_at = created_at + interval '14 days'
-where expires_at is null;
+ALTER TABLE public.invites
+  ADD COLUMN IF NOT EXISTS expires_at timestamptz;
 
-alter table public.invites
-  alter column expires_at set default (now() + interval '14 days');
+-- Backfill: invites without expiry get 14 days from creation (only rows still null).
+UPDATE public.invites
+SET expires_at = created_at + interval '14 days'
+WHERE expires_at IS NULL;
+
+ALTER TABLE public.invites
+  ALTER COLUMN expires_at SET DEFAULT (now() + interval '14 days');

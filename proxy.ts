@@ -87,6 +87,7 @@ export async function proxy(request: NextRequest) {
       "message",
       "Please log in to continue"
     );
+    authDebug("proxy redirect", { reason: "unauthenticated", from: pathname, to: "/login" });
     return NextResponse.redirect(loginUrl);
   }
 
@@ -105,6 +106,7 @@ export async function proxy(request: NextRequest) {
       const conflictUrl = request.nextUrl.clone();
       conflictUrl.pathname = "/workspace-conflict";
       conflictUrl.search = "";
+      authDebug("proxy redirect", { reason: "multi-workspace", from: pathname, to: "/workspace-conflict" });
       return NextResponse.redirect(conflictUrl);
     }
 
@@ -114,11 +116,17 @@ export async function proxy(request: NextRequest) {
     const isCompleteAccountPath = pathname.startsWith("/complete-account");
     const isInviteRecoveryPath = pathname.startsWith("/invite-link-expired");
     const isResetPasswordPath = pathname.startsWith("/reset-password");
+    const isAuthCallbackPath = pathname.startsWith("/auth/callback");
 
     if (pathname === "/login" && !isRecoveryMode) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = hasActiveCompany ? "/" : "/create-company";
       redirectUrl.search = "";
+      authDebug("proxy redirect", {
+        reason: "logged-in on /login",
+        to: redirectUrl.pathname,
+        hasActiveCompany,
+      });
       return NextResponse.redirect(redirectUrl);
     }
 
@@ -128,11 +136,17 @@ export async function proxy(request: NextRequest) {
       !isJoinInvitePath &&
       !isCompleteAccountPath &&
       !isInviteRecoveryPath &&
-      !isResetPasswordPath
+      !isResetPasswordPath &&
+      !isAuthCallbackPath
     ) {
       const createCompanyUrl = request.nextUrl.clone();
       createCompanyUrl.pathname = "/create-company";
       createCompanyUrl.search = "";
+      authDebug("proxy redirect", {
+        reason: "no active company",
+        from: pathname,
+        to: "/create-company",
+      });
       return NextResponse.redirect(createCompanyUrl);
     }
 
@@ -143,6 +157,11 @@ export async function proxy(request: NextRequest) {
       const homeUrl = request.nextUrl.clone();
       homeUrl.pathname = "/";
       homeUrl.search = "";
+      authDebug("proxy redirect", {
+        reason: "has company on onboarding/auth path",
+        from: pathname,
+        to: "/",
+      });
       return NextResponse.redirect(homeUrl);
     }
   }

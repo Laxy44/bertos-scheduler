@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AppShell from "../components/layout/AppShell";
+import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
 import { getLinkedProfileEmployee } from "@/lib/profile-employee";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { maybeSendWelcomeEmailForUser } from "../lib/welcome-email-trigger";
@@ -16,30 +17,6 @@ function readParam(value: string | string[] | undefined) {
 type ProfileRow = {
   role?: string | null;
   name?: string | null;
-};
-
-type CompanyMemberRow = {
-  company_id?: string | null;
-  role?: string | null;
-  status?: string | null;
-  companies?:
-    | {
-        name?: string | null;
-        cvr?: string | null;
-        timezone?: string | null;
-        week_starts_on?: string | null;
-        currency?: string | null;
-        default_hourly_wage?: number | null;
-      }
-    | {
-        name?: string | null;
-        cvr?: string | null;
-        timezone?: string | null;
-        week_starts_on?: string | null;
-        currency?: string | null;
-        default_hourly_wage?: number | null;
-      }[]
-    | null;
 };
 
 export default async function Page({ searchParams }: PageProps) {
@@ -61,72 +38,31 @@ export default async function Page({ searchParams }: PageProps) {
   await maybeSendWelcomeEmailForUser(user);
 
   let profile: ProfileRow | null = null;
-  let membership: CompanyMemberRow | null = null;
-
-  const profileQuery = await supabase
-    .from("profiles")
-    .select("role, name")
-    .eq("id", user.id)
-    .maybeSingle();
-
+  const profileQuery = await supabase.from("profiles").select("role, name").eq("id", user.id).maybeSingle();
   if (!profileQuery.error) {
     profile = profileQuery.data;
   }
 
-  // Transitional multi-company lookup.
-  // This safely checks whether the user already belongs to a company workspace.
-  // If the SaaS tables are not ready yet, the app still falls back gracefully.
-  const membershipQuery = await supabase
-    .from("company_members")
-    .select(
-      `
-        company_id,
-        role,
-        status,
-        companies (
-          name,
-          cvr,
-          timezone,
-          week_starts_on,
-          currency,
-          default_hourly_wage
-        )
-      `
-    )
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .order("company_id", { ascending: true })
-    .limit(2);
-
-  if (!membershipQuery.error) {
-    const rows = membershipQuery.data || [];
-    if (rows.length > 1) {
-      redirect("/workspace-conflict");
-    }
-    membership = rows[0] ?? null;
+  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
+  if (workspace.kind === "conflict") {
+    redirect("/workspace-conflict");
   }
-
-  // During transition:
-  // 1. prefer company_members.role when available
-  // 2. fall back to profiles.role for older data
-  const role = membership?.role ?? profile?.role ?? "employee";
-  const employeeName = profile?.name ?? user.email ?? "Unknown user";
-  const activeCompanyId = membership?.company_id ?? null;
-  const companyRow = Array.isArray(membership?.companies)
-    ? membership?.companies[0]
-    : membership?.companies;
-  const companyName = companyRow?.name ?? null;
-  const companyCvr = companyRow?.cvr ?? null;
-  const companyWeekStartsOn =
-    (companyRow?.week_starts_on || "monday").toLowerCase() === "sunday" ? "sunday" : "monday";
-  const companyCurrency = companyRow?.currency ?? null;
-  const rawWage = companyRow?.default_hourly_wage;
-  const companyDefaultHourlyWage =
-    rawWage != null && !Number.isNaN(Number(rawWage)) ? Number(rawWage) : null;
-
-  if (!activeCompanyId) {
+  if (workspace.kind === "none") {
     redirect("/create-company");
   }
+
+  const { membership, company } = workspace;
+  const role = membership.role ?? profile?.role ?? "employee";
+  const employeeName = profile?.name ?? user.email ?? "Unknown user";
+  const activeCompanyId = membership.company_id;
+  const companyName = company?.name ?? null;
+  const companyCvr = company?.cvr ?? null;
+  const companyWeekStartsOn =
+    (company?.week_starts_on || "monday").toLowerCase() === "sunday" ? "sunday" : "monday";
+  const companyCurrency = company?.currency ?? null;
+  const rawWage = company?.default_hourly_wage;
+  const companyDefaultHourlyWage =
+    rawWage != null && !Number.isNaN(Number(rawWage)) ? Number(rawWage) : null;
 
   await getLinkedProfileEmployee(supabase, {
     userId: user.id,

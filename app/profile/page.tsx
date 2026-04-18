@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import ProfileForm from "@/components/profile/ProfileForm";
+import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
 import { getLinkedProfileEmployee, mapEmployeeRowToView } from "@/lib/profile-employee";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -17,37 +18,16 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  const membershipQuery = await supabase
-    .from("company_members")
-    .select(
-      `
-        company_id,
-        companies (
-          name
-        )
-      `
-    )
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .order("company_id", { ascending: true })
-    .limit(2);
-
-  if (membershipQuery.error) {
-    console.error("[profile] membership", membershipQuery.error.message);
-  }
-
-  const rows = membershipQuery.data || [];
-  if (rows.length > 1) {
+  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
+  if (workspace.kind === "conflict") {
     redirect("/workspace-conflict");
   }
-
-  const companyId = rows[0]?.company_id ?? null;
-  if (!companyId) {
+  if (workspace.kind === "none") {
     redirect("/create-company");
   }
 
-  const companyRow = Array.isArray(rows[0]?.companies) ? rows[0]?.companies[0] : rows[0]?.companies;
-  const companyName = (companyRow as { name?: string | null } | null)?.name ?? null;
+  const companyId = workspace.membership.company_id;
+  const companyName = workspace.company?.name ?? null;
 
   const linked = await getLinkedProfileEmployee(supabase, {
     userId: user.id,

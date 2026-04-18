@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import ContractedHoursClient from "@/components/contracted-hours/ContractedHoursClient";
+import { loadActiveMembershipAndCompany } from "@/lib/active-membership-load";
 import { isCompanyAdminRole } from "@/lib/workspace-role";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { addDays, getDayNameFromDate, startOfWeek, toDateInputValue } from "@/lib/utils";
@@ -9,13 +10,6 @@ import type { Shift } from "@/types/schedule";
 export const metadata: Metadata = {
   title: "Contracted hours",
   description: "Weekly targets vs planned hours from the schedule",
-};
-
-type CompanyMemberRow = {
-  company_id?: string | null;
-  role?: string | null;
-  status?: string | null;
-  companies?: { name?: string | null } | { name?: string | null }[] | null;
 };
 
 function mapRowToShift(row: Record<string, unknown>): Shift {
@@ -45,35 +39,18 @@ export default async function ContractedHoursPage() {
     redirect("/login");
   }
 
-  const membershipQuery = await supabase
-    .from("company_members")
-    .select(
-      `
-        company_id,
-        role,
-        status,
-        companies ( name )
-      `
-    )
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .order("company_id", { ascending: true })
-    .limit(2);
-
-  if (!membershipQuery.error && (membershipQuery.data || []).length > 1) {
+  const workspace = await loadActiveMembershipAndCompany(supabase, user.id);
+  if (workspace.kind === "conflict") {
     redirect("/workspace-conflict");
   }
-
-  const membership = membershipQuery.data?.[0] as CompanyMemberRow | undefined;
-  const activeCompanyId = membership?.company_id ?? null;
-  const companyRow = Array.isArray(membership?.companies) ? membership?.companies[0] : membership?.companies;
-  const companyName = companyRow?.name ?? null;
-
-  if (!activeCompanyId) {
+  if (workspace.kind === "none") {
     redirect("/create-company");
   }
 
-  const workspaceRole = (membership?.role || "").trim();
+  const activeCompanyId = workspace.membership.company_id;
+  const companyName = workspace.company?.name ?? null;
+
+  const workspaceRole = (workspace.membership.role || "").trim();
   if (!isCompanyAdminRole(workspaceRole)) {
     redirect("/your-schedule");
   }
