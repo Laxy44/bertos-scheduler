@@ -1,6 +1,12 @@
 import Link from "next/link";
 
 import LandingHeader from "./LandingHeader";
+import { TrustLogosRow } from "./TrustLogos";
+
+/** Tiled SVG film grain — CSS-only (feTurbulence), very low alpha */
+const HERO_NOISE_BG = `url("data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><filter id="g"><feTurbulence type="fractalNoise" baseFrequency="0.78" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#g)" opacity="0.045"/></svg>'
+)}")`;
 
 type LandingPageProps = {
   isAuthenticated?: boolean;
@@ -189,8 +195,6 @@ export default function LandingPage({ isAuthenticated = false }: LandingPageProp
     { quote: "Payroll prep went from hours to a quick review.", role: "Owner", initials: "OW" },
   ];
 
-  const trustNames = ["Cedar & Salt", "Marlowe Café", "Northlight Retail", "Birchline Foods"];
-
   return (
     <div className="min-h-screen bg-[#fafafa] text-[#0a0a0a] antialiased selection:bg-blue-100 selection:text-blue-950">
       <LandingHeader isAuthenticated={isAuthenticated} />
@@ -199,7 +203,16 @@ export default function LandingPage({ isAuthenticated = false }: LandingPageProp
         {/* Hero */}
         <section className="relative overflow-hidden border-b border-slate-200/40 bg-gradient-to-b from-white via-[#fafafa] to-[#f3f6fb]/80">
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_70%_20%,rgba(37,99,235,0.06),transparent)]" />
-          <div className={`${shell} pb-16 pt-14 md:pb-24 md:pt-20 lg:pb-28 lg:pt-24`}>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 mix-blend-multiply opacity-[0.35]"
+            style={{
+              backgroundImage: HERO_NOISE_BG,
+              backgroundRepeat: "repeat",
+              backgroundSize: "192px 192px",
+            }}
+          />
+          <div className={`${shell} relative pb-16 pt-14 md:pb-24 md:pt-20 lg:pb-28 lg:pt-24`}>
             <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16 xl:gap-20">
               <div className="max-w-[560px]">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700/90">Planyo</p>
@@ -236,16 +249,7 @@ export default function LandingPage({ isAuthenticated = false }: LandingPageProp
             <p className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Trusted by growing teams
             </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3 md:gap-6">
-              {trustNames.map((name) => (
-                <span
-                  key={name}
-                  className="text-sm font-medium text-slate-400/90 opacity-[0.72] transition-opacity duration-200 hover:opacity-100"
-                >
-                  {name}
-                </span>
-              ))}
-            </div>
+            <TrustLogosRow />
           </div>
         </div>
 
