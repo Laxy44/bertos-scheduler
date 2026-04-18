@@ -6,7 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "../../lib/supabase";
 import ScheduleSection from "../schedule/ScheduleSection";
 import ShiftFormModal from "../schedule/ShiftFormModal";
-import GuidedWorkspaceSetup from "../onboarding/GuidedWorkspaceSetup";
+import GuidedWorkspaceSetup, {
+  type GuidedChecklistStep,
+} from "../onboarding/GuidedWorkspaceSetup";
 import WorkspaceAppNav from "./WorkspaceAppNav";
 import TimesheetsReport from "../reports/TimesheetsReport";
 import PayrollOverview, { type PayrollOverviewRow } from "../payroll/PayrollOverview";
@@ -25,10 +27,6 @@ import EmployeesSection from "../employees/EmployeesSection";
 import EmployeeGroupsSection from "../people/EmployeeGroupsSection";
 import HomeDashboardSection, { type SetupCard } from "../dashboard/HomeDashboardSection";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-
-
-
 import type {
   AppTab,
   EmployeeConfig,
@@ -119,6 +117,9 @@ type AppShellProps = {
 
 const GUIDED_DISMISS_KEY = "planyo_guided_setup_dismissed_v1";
 const GUIDED_PENDING_KEY = "planyo_guided_pending";
+const GUIDED_KEEP_OPEN_KEY = "planyo_guided_keep_open_v1";
+const ONBOARDING_DONE_STORAGE_PREFIX = "planyo_onboarding_done_v2_";
+const PAYROLL_VISITED_STORAGE_PREFIX = "planyo_payroll_seen_v1_";
 
 export default function AppShell({
   role,
@@ -197,6 +198,21 @@ export default function AppShell({
     await loadEmployeeGroups();
   }, [activeCompanyId, isAdmin, loadEmployeeGroups, supabase]);
 
+  const refreshPendingInviteCount = useCallback(async () => {
+    if (!activeCompanyId || !isAdmin) {
+      setPendingInviteCount(0);
+      return;
+    }
+    const { count, error } = await supabase
+      .from("invites")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", activeCompanyId)
+      .eq("status", "pending");
+    if (!error) {
+      setPendingInviteCount(count ?? 0);
+    }
+  }, [activeCompanyId, isAdmin, supabase]);
+
   async function handleLogout() {
     await supabase.auth.signOut();
     // Single full navigation: clears RSC cache without an extra refresh round-trip.
@@ -222,6 +238,11 @@ export default function AppShell({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [guidedSetupOpen, setGuidedSetupOpen] = useState(false);
+  const [employeeCreateModalSignal, setEmployeeCreateModalSignal] = useState(0);
+  const [pendingInviteCount, setPendingInviteCount] = useState(0);
+  const [premiumOnboardingDone, setPremiumOnboardingDone] = useState(false);
+  const [payrollVisited, setPayrollVisited] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [shiftDayAvailabilityByEmployee, setShiftDayAvailabilityByEmployee] = useState<
     Record<string, string>
   >({});
@@ -250,6 +271,44 @@ export default function AppShell({
       cancelled = true;
     };
   }, [supabase]);
+
+  useEffect(() => {
+    if (!activeCompanyId) {
+      setPremiumOnboardingDone(false);
+      setPayrollVisited(false);
+      return;
+    }
+    try {
+      setPremiumOnboardingDone(
+        localStorage.getItem(ONBOARDING_DONE_STORAGE_PREFIX + activeCompanyId) === "1"
+      );
+      setPayrollVisited(
+        localStorage.getItem(PAYROLL_VISITED_STORAGE_PREFIX + activeCompanyId) === "1"
+      );
+    } catch {
+      setPremiumOnboardingDone(false);
+      setPayrollVisited(false);
+    }
+  }, [activeCompanyId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("toast") === "invite_sent") {
+      setToastMessage("Invitation sent");
+      void refreshPendingInviteCount();
+      params.delete("toast");
+      const qs = params.toString();
+      const next = qs ? `?${qs}` : "";
+      window.history.replaceState(null, "", `${window.location.pathname}${next}`);
+    }
+  }, [refreshPendingInviteCount]);
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = window.setTimeout(() => setToastMessage(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [toastMessage]);
 
   useEffect(() => {
     async function fetchEmployees() {
@@ -620,18 +679,27 @@ export default function AppShell({
     return list;
   }, [isAdmin, activeEmployees.length, shifts, homeWeekDateSet]);
 
-  const hasShiftsForGuided = shifts.length > 0;
+  useEffect(() => {
+    void refreshPendingInviteCount();
+  }, [refreshPendingInviteCount, employees.length, shifts.length]);
 
   useEffect(() => {
-    if (hasShiftsForGuided) {
+    if (premiumOnboardingDone) {
       resumeGuidedAfterShiftModalClose.current = false;
       resumeGuidedWhenHome.current = false;
       setGuidedSetupOpen(false);
+      try {
+        if (typeof window !== "undefined") {
+          window.sessionStorage.removeItem(GUIDED_KEEP_OPEN_KEY);
+        }
+      } catch {
+        // ignore
+      }
     }
-  }, [hasShiftsForGuided]);
+  }, [premiumOnboardingDone]);
 
   useEffect(() => {
-    if (!isAdmin || hasShiftsForGuided) return;
+    if (!isAdmin || premiumOnboardingDone) return;
     try {
       if (typeof window !== "undefined" && window.sessionStorage.getItem(GUIDED_DISMISS_KEY)) {
         return;
@@ -641,9 +709,15 @@ export default function AppShell({
     }
     let shouldOpen = Boolean(launchGuidedSetup);
     try {
-      if (typeof window !== "undefined" && window.sessionStorage.getItem(GUIDED_PENDING_KEY) === "1") {
-        window.sessionStorage.removeItem(GUIDED_PENDING_KEY);
-        shouldOpen = true;
+      if (typeof window !== "undefined") {
+        if (window.sessionStorage.getItem(GUIDED_PENDING_KEY) === "1") {
+          window.sessionStorage.removeItem(GUIDED_PENDING_KEY);
+          window.sessionStorage.setItem(GUIDED_KEEP_OPEN_KEY, "1");
+          shouldOpen = true;
+        }
+        if (window.sessionStorage.getItem(GUIDED_KEEP_OPEN_KEY) === "1") {
+          shouldOpen = true;
+        }
       }
     } catch {
       // ignore
@@ -651,7 +725,7 @@ export default function AppShell({
     if (shouldOpen) {
       setGuidedSetupOpen(true);
     }
-  }, [isAdmin, hasShiftsForGuided, launchGuidedSetup]);
+  }, [isAdmin, premiumOnboardingDone, launchGuidedSetup]);
 
   const readGuidedDismissedSession = useCallback(() => {
     try {
@@ -665,7 +739,7 @@ export default function AppShell({
   }, []);
 
   useEffect(() => {
-    if (!isAdmin || hasShiftsForGuided) {
+    if (!isAdmin || premiumOnboardingDone) {
       resumeGuidedAfterShiftModalClose.current = false;
       return;
     }
@@ -675,10 +749,10 @@ export default function AppShell({
         setGuidedSetupOpen(true);
       }
     }
-  }, [isAdmin, hasShiftsForGuided, showShiftForm, readGuidedDismissedSession]);
+  }, [isAdmin, premiumOnboardingDone, showShiftForm, readGuidedDismissedSession]);
 
   useEffect(() => {
-    if (!isAdmin || hasShiftsForGuided) {
+    if (!isAdmin || premiumOnboardingDone) {
       resumeGuidedWhenHome.current = false;
       return;
     }
@@ -688,7 +762,7 @@ export default function AppShell({
         setGuidedSetupOpen(true);
       }
     }
-  }, [isAdmin, hasShiftsForGuided, activeTab, readGuidedDismissedSession]);
+  }, [isAdmin, premiumOnboardingDone, activeTab, readGuidedDismissedSession]);
 
   const activeEmployeesAvailabilityKey = useMemo(
     () =>
@@ -1148,6 +1222,8 @@ export default function AppShell({
       notes: form.notes || null,
     };
 
+    const creatingFirstShift = editingId === null && shifts.length === 0;
+
     if (editingId !== null) {
       const { data, error } = await supabase
         .from("shifts")
@@ -1206,6 +1282,9 @@ export default function AppShell({
       };
 
       setShifts((current) => [...current, newShift]);
+      if (creatingFirstShift) {
+        setToastMessage("Your first shift is live 🎉");
+      }
     }
 
     resetForm();
@@ -2566,46 +2645,103 @@ export default function AppShell({
     try {
       if (typeof window !== "undefined") {
         window.sessionStorage.setItem(GUIDED_DISMISS_KEY, "1");
+        window.sessionStorage.removeItem(GUIDED_KEEP_OPEN_KEY);
       }
     } catch {
       // ignore
     }
   }
 
-  function openEmployeeGroupsFromGuided() {
-    if (!guardAdmin("manage employee groups")) {
-      return;
+  function markPayrollVisitedStorage() {
+    if (!activeCompanyId) return;
+    try {
+      localStorage.setItem(PAYROLL_VISITED_STORAGE_PREFIX + activeCompanyId, "1");
+      setPayrollVisited(true);
+    } catch {
+      // ignore
     }
-    closeAllNavMenus();
-    setActiveTab("employee-groups");
-    setGuidedSetupOpen(false);
-    resumeGuidedWhenHome.current = true;
   }
 
-  function openEmployeesFromGuided() {
+  function completePremiumOnboarding() {
+    if (!activeCompanyId) return;
+    try {
+      localStorage.setItem(ONBOARDING_DONE_STORAGE_PREFIX + activeCompanyId, "1");
+      setPremiumOnboardingDone(true);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(GUIDED_KEEP_OPEN_KEY);
+      }
+    } catch {
+      // ignore
+    }
+    setGuidedSetupOpen(false);
+    setToastMessage("Your workspace is ready 🚀");
+  }
+
+  function touchGuidedKeepOpen() {
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(GUIDED_KEEP_OPEN_KEY, "1");
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  function guidedOpenAddEmployee() {
     if (!guardAdmin("manage employees")) {
       return;
     }
+    touchGuidedKeepOpen();
     closeAllNavMenus();
     setActiveTab("employees");
-    setGuidedSetupOpen(false);
-    resumeGuidedWhenHome.current = true;
+    setEmployeeCreateModalSignal((n) => n + 1);
   }
 
-  function guidedCreateShift() {
+  function guidedOpenCreateShift() {
+    if (!guardAdmin("create shifts")) {
+      return;
+    }
+    touchGuidedKeepOpen();
     closeAllNavMenus();
     resumeGuidedAfterShiftModalClose.current = true;
-    setGuidedSetupOpen(false);
     openCreateShiftFromHeader();
+  }
+
+  function guidedOpenPayrollFromChecklist() {
+    touchGuidedKeepOpen();
+    openPayrollOverviewFromHome();
+  }
+
+  function guidedFinishWithSchedule() {
+    const teamDone = employees.length > 1;
+    const shiftDone = shifts.length > 0;
+    const inviteDone = pendingInviteCount > 0;
+    const payrollDone = payrollVisited;
+    if (!teamDone || !shiftDone || !inviteDone || !payrollDone) {
+      setActiveTab("schedule");
+      return;
+    }
+    completePremiumOnboarding();
+    setActiveTab("schedule");
   }
 
   function openRunSetupGuideFromHome() {
     if (!guardAdmin("run the setup guide")) {
       return;
     }
+    if (activeCompanyId) {
+      try {
+        if (localStorage.getItem(ONBOARDING_DONE_STORAGE_PREFIX + activeCompanyId) === "1") {
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    }
     try {
       if (typeof window !== "undefined") {
         window.sessionStorage.removeItem(GUIDED_DISMISS_KEY);
+        window.sessionStorage.setItem(GUIDED_KEEP_OPEN_KEY, "1");
       }
     } catch {
       // ignore
@@ -2626,6 +2762,7 @@ export default function AppShell({
     if (!guardAdmin("send team invites")) {
       return;
     }
+    touchGuidedKeepOpen();
     router.push("/app/invites");
   }
 
@@ -2633,6 +2770,7 @@ export default function AppShell({
     if (!guardAdmin("open payroll")) {
       return;
     }
+    markPayrollVisitedStorage();
     setActiveTab("payroll-overview");
   }
 
@@ -2722,6 +2860,7 @@ export default function AppShell({
     setIsUserMenuOpen(false);
     if (tab === "payroll-overview") {
       setPayrollSelectedEmployee(null);
+      markPayrollVisitedStorage();
     }
   }
 
@@ -2829,6 +2968,63 @@ export default function AppShell({
     ]
   );
 
+  const guidedChecklistSteps: GuidedChecklistStep[] = (() => {
+    const teamDone = employees.length > 1;
+    const shiftDone = shifts.length > 0;
+    const inviteDone = pendingInviteCount > 0;
+    const payrollDone = payrollVisited;
+    const readyDone = premiumOnboardingDone;
+
+    return [
+      {
+        id: "team",
+        title: "Add your team",
+        description: "Add an employee who should appear on the schedule.",
+        done: teamDone,
+        ctaLabel: teamDone ? "Manage employees" : "Add employee",
+        onCta: () => (teamDone ? openAddEmployeeFromHeader() : guidedOpenAddEmployee()),
+      },
+      {
+        id: "shift",
+        title: "Create your first shift",
+        description: "Put a shift on the calendar so totals and payroll start to make sense.",
+        done: shiftDone,
+        ctaLabel: shiftDone ? "Open schedule" : "Create shift",
+        onCta: () => (shiftDone ? setActiveTab("schedule") : guidedOpenCreateShift()),
+      },
+      {
+        id: "invite",
+        title: "Invite your team",
+        description: "Send an email invite so people can log in and see their shifts.",
+        done: inviteDone,
+        ctaLabel: inviteDone ? "Manage invites" : "Invite employees",
+        onCta: () => openInviteTeamFromHome(),
+      },
+      {
+        id: "payroll",
+        title: "Review payroll",
+        description: "Skim rates and totals so you are confident before payday.",
+        done: payrollDone,
+        ctaLabel: payrollDone ? "Payroll" : "Go to payroll",
+        onCta: () => guidedOpenPayrollFromChecklist(),
+      },
+      {
+        id: "ready",
+        title: "You're ready 🚀",
+        description: "Your workspace is configured — jump into the schedule any time.",
+        done: readyDone,
+        ctaLabel: "Open schedule",
+        onCta: () => guidedFinishWithSchedule(),
+      },
+    ];
+  })();
+
+  const guidedHighlightIndex = (() => {
+    const idx = guidedChecklistSteps.findIndex((s) => !s.done);
+    if (idx === -1) return Math.max(0, guidedChecklistSteps.length - 1);
+    return idx;
+  })();
+
   return (
     <main className="flex min-h-screen w-full flex-col bg-slate-200/40 text-slate-900">
       <datalist id="role-suggestions">
@@ -2885,16 +3081,20 @@ export default function AppShell({
 
         {isAdmin ? (
           <GuidedWorkspaceSetup
-            open={guidedSetupOpen}
-            hasEmployeeGroups={employeeGroups.length > 0}
-            hasEmployees={hasEmployees}
-            hasShifts={hasShifts}
+            open={guidedSetupOpen && !premiumOnboardingDone}
+            steps={guidedChecklistSteps}
+            currentIndex={guidedHighlightIndex}
             onDismiss={dismissGuidedSetup}
-            onCreateDefaultGroup={ensureDefaultEmployeeGroup}
-            onOpenEmployeeGroups={openEmployeeGroupsFromGuided}
-            onOpenEmployees={openEmployeesFromGuided}
-            onCreateShift={guidedCreateShift}
           />
+        ) : null}
+
+        {toastMessage ? (
+          <div
+            className="pointer-events-none fixed bottom-6 left-1/2 z-[95] w-[min(100%-2rem,24rem)] -translate-x-1/2 rounded-2xl border border-slate-200/80 bg-slate-900 px-4 py-3 text-center text-sm font-medium text-white shadow-xl shadow-slate-900/20"
+            role="status"
+          >
+            {toastMessage}
+          </div>
         ) : null}
 
         <div className="flex w-full flex-1 flex-col px-4 pb-10 pt-4 xl:px-6 2xl:px-8">
@@ -2933,13 +3133,14 @@ export default function AppShell({
                     Add Employee
                   </button>
                 ) : null}
-                {normalizedRole === "owner" ? (
-                  <Link
-                    href="/app/invites"
-                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={openInviteTeamFromHome}
+                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
                   >
-                    Invite
-                  </Link>
+                    Invite Team
+                  </button>
                 ) : null}
                 <button
                   type="button"
@@ -3039,7 +3240,7 @@ export default function AppShell({
             onReviewPayroll={openPayrollOverviewFromHome}
             onOpenSchedule={() => setActiveTab("schedule")}
             showPayrollCta
-            showRunSetupGuide={!hasShifts}
+            showRunSetupGuide={!premiumOnboardingDone}
             onRunSetupGuide={openRunSetupGuideFromHome}
             dashboard={adminHomeDashboard}
             upcomingShifts={adminHomeUpcoming}
@@ -3167,6 +3368,8 @@ export default function AppShell({
             }}
             onExportCsv={downloadPayrollCsv}
             onExportPdf={downloadPayrollPdf}
+            showScheduleEmptyHint={shifts.length === 0}
+            onGoToSchedule={() => setActiveTab("schedule")}
           />
         )}
         {isAdmin && activeTab === "payroll-employee" && payrollSelectedEmployee ? (
@@ -3191,6 +3394,8 @@ export default function AppShell({
        {isAdmin && activeTab === "employees" && (
           <EmployeesSection
             sortedEmployeesData={sortedEmployeesData}
+            openCreateModalSignal={employeeCreateModalSignal}
+            showSoloOwnerTeamBanner={sortedEmployeesData.length <= 1}
             roleSuggestions={roleSuggestions}
             addEmployee={addEmployee}
             setEmployeeActiveStatus={setEmployeeActiveStatus}

@@ -67,7 +67,14 @@ export default function EmailConfirmationPolling({
 
       timeoutRef.current = window.setTimeout(() => {
         if (cancelled) return;
-        router.replace(session ? "/app" : "/login?confirmed=1");
+        if (session && typeof window !== "undefined") {
+          try {
+            window.sessionStorage.setItem("planyo_guided_pending", "1");
+          } catch {
+            // ignore
+          }
+        }
+        router.replace(session ? "/app?guided=1" : "/login?confirmed=1");
       }, 650);
     };
 

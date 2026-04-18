@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import OwnerOnboardingWizard from "../../components/onboarding/OwnerOnboardingWizard";
+import WorkspaceSignupForm from "../../components/onboarding/WorkspaceSignupForm";
 import { getActiveMembership } from "../../lib/auth";
 import { createServerSupabaseClient } from "../../lib/supabase-server";
 import { getLatestInviteByEmail } from "../../lib/workspace-invite-admin";
@@ -52,23 +52,27 @@ export default async function CreateCompanyPage({
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-slate-900">Set up Planyo</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Create your workspace</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Complete the onboarding steps to launch your workspace.
+          One short form — then you&apos;ll land in the app with a quick setup guide.
         </p>
-        <OwnerOnboardingWizard
+        <WorkspaceSignupForm
           action={finishOwnerOnboarding}
           initialMessage={message}
           isLoggedInWithoutMembership={isLoggedInWithoutMembership}
           existingUserEmail={userEmail}
         />
 
+        <p className="mt-6 text-center text-sm text-slate-600">
+          Already have an account?{" "}
+          <Link href="/login" className="font-semibold text-slate-900 underline-offset-2 hover:underline">
+            Log in
+          </Link>
+        </p>
+
         <div className="mt-4 flex flex-col gap-2 text-center text-sm font-medium">
           <Link href="/" className="text-slate-600 hover:text-slate-900">
             Planyo home
-          </Link>
-          <Link href="/login" className="text-slate-600 hover:text-slate-900">
-            Back to login
           </Link>
         </div>
       </div>

@@ -238,11 +238,11 @@ export default function ScheduleGrid({
                 ) : null}
               </div>
               <div className="p-8 text-center sm:p-10" style={{ gridColumn: `2 / span ${colCount}` }}>
-                <p className="text-lg font-semibold text-slate-900">No shifts scheduled yet</p>
+                <p className="text-lg font-semibold text-slate-900">No shifts created yet</p>
                 <p className="mt-2 text-sm text-slate-600">
                   {isReadOnly
                     ? "When your manager assigns shifts, they will appear here."
-                    : "Click a cell to create your first shift, or add more employees."}
+                    : "Create your first shift to see the week fill in, or add more employees to the roster."}
                 </p>
                 {!isReadOnly ? (
                   <div className="mt-4 flex flex-wrap justify-center gap-2">

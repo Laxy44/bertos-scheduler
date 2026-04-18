@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EmployeeConfig, EmployeeGroupRow } from "../../types/schedule";
 
 const inputClass =
@@ -339,6 +339,10 @@ function EmployeeDetailPanel({
 
 export type EmployeesSectionProps = {
   sortedEmployeesData: EmployeeConfig[];
+  /** Increment from parent to open the create-employee modal (e.g. onboarding). */
+  openCreateModalSignal?: number;
+  /** Show a friendly banner when only the owner is on the roster. */
+  showSoloOwnerTeamBanner?: boolean;
   roleSuggestions: string[];
   addEmployee: (overrides?: {
     name?: string;
@@ -360,6 +364,8 @@ export type EmployeesSectionProps = {
 
 export default function EmployeesSection({
   sortedEmployeesData,
+  openCreateModalSignal = 0,
+  showSoloOwnerTeamBanner = false,
   roleSuggestions,
   addEmployee,
   setEmployeeActiveStatus,
@@ -439,6 +445,15 @@ export default function EmployeesSection({
     setErrorMessage(null);
     setIsModalOpen(true);
   }
+
+  const openModalRef = useRef(openModal);
+  openModalRef.current = openModal;
+
+  useEffect(() => {
+    if (openCreateModalSignal > 0) {
+      openModalRef.current();
+    }
+  }, [openCreateModalSignal]);
 
   function closeModal() {
     if (isSubmitting) return;
@@ -571,6 +586,21 @@ export default function EmployeesSection({
         {statusMessage ? (
           <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
             {statusMessage}
+          </div>
+        ) : null}
+        {showSoloOwnerTeamBanner ? (
+          <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 text-sm text-indigo-950 ring-1 ring-indigo-100">
+            <p className="font-semibold">No employees yet</p>
+            <p className="mt-1 text-indigo-900/90">
+              Add someone to your team so you can assign shifts and send invites.
+            </p>
+            <button
+              type="button"
+              onClick={openModal}
+              className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-800"
+            >
+              Add employee
+            </button>
           </div>
         ) : null}
       </div>

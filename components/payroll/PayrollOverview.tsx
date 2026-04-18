@@ -40,6 +40,9 @@ type PayrollOverviewProps = {
   onRowClick: (employeeName: string) => void;
   onExportCsv: () => void;
   onExportPdf: () => void;
+  /** When there is nothing to review yet, show a guided empty state. */
+  showScheduleEmptyHint?: boolean;
+  onGoToSchedule?: () => void;
 };
 
 export default function PayrollOverview({
@@ -71,6 +74,8 @@ export default function PayrollOverview({
   onRowClick,
   onExportCsv,
   onExportPdf,
+  showScheduleEmptyHint = false,
+  onGoToSchedule,
 }: PayrollOverviewProps) {
   const modeBtn = (mode: PayrollRangeMode, label: string) => (
     <button
@@ -213,6 +218,22 @@ export default function PayrollOverview({
             </select>
           </div>
         </div>
+
+        {showScheduleEmptyHint && onGoToSchedule ? (
+          <div className="mx-5 mb-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-center md:mx-6">
+            <p className="text-sm font-semibold text-slate-900">No payroll data yet</p>
+            <p className="mt-1 text-xs text-slate-600">
+              Payroll totals build from scheduled shifts. Create shifts first, then come back here.
+            </p>
+            <button
+              type="button"
+              onClick={onGoToSchedule}
+              className="mt-3 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-800"
+            >
+              Go to schedule
+            </button>
+          </div>
+        ) : null}
 
         <div className="grid gap-4 border-t border-slate-100 px-5 pb-5 md:grid-cols-3 md:px-6">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">

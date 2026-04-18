@@ -54,7 +54,7 @@ export async function createInvite(formData: FormData) {
     redirect(`/app/invites?message=${encodeURIComponent(result.error)}`);
   }
 
-  redirect("/app/invites?message=Invite created and email sent");
+  redirect("/app?toast=invite_sent");
 }
 
 export async function cancelInvite(formData: FormData) {
