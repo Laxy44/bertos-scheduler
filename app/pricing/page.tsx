@@ -6,7 +6,8 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "Simple pricing for growing teams. Start free, upgrade when you need more.",
+  description:
+    "Starter is free for small teams. Premium is coming soon — join the waitlist for early access.",
 };
 
 export default async function PricingPage() {
